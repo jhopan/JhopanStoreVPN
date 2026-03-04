@@ -70,8 +70,7 @@ jobs:
 
       - name: Download Xray-core
         run: |
-          RELEASE_URL=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases/latest | grep -o 'https://[^"]*Xray-linux-64.zip')
-          curl -L -o xray.zip "$RELEASE_URL"
+          curl -L -o xray.zip "https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip"
           unzip xray.zip xray -d .
           chmod +x xray
 
@@ -111,11 +110,11 @@ jobs:
         run: |
           ARCH=$(uname -m)
           if [ "$ARCH" = "arm64" ]; then
-            RELEASE_URL=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases/latest | grep -o 'https://[^"]*Xray-macos-arm64-v8a.zip')
+            XRAY_ZIP="Xray-macos-arm64-v8a.zip"
           else
-            RELEASE_URL=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases/latest | grep -o 'https://[^"]*Xray-macos-64.zip')
+            XRAY_ZIP="Xray-macos-64.zip"
           fi
-          curl -L -o xray.zip "$RELEASE_URL"
+          curl -L -o xray.zip "https://github.com/XTLS/Xray-core/releases/latest/download/${XRAY_ZIP}"
           unzip xray.zip xray -d .
           chmod +x xray
 
