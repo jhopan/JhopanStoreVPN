@@ -29,7 +29,7 @@ jobs:
         shell: pwsh
         run: |
           $env:CGO_ENABLED = "1"
-          go build -v -ldflags="-s -w" -o JhopanStoreVPN.exe .
+          go build -v -ldflags="-s -w -H windowsgui" -o JhopanStoreVPN.exe .
 
       - name: Package
         shell: pwsh
@@ -85,6 +85,32 @@ jobs:
           cp assets/icon256.png release/JhopanStoreVPN-linux/assets/
           chmod +x release/JhopanStoreVPN-linux/JhopanStoreVPN
           chmod +x release/JhopanStoreVPN-linux/xray
+
+          # Create launcher script (detaches from terminal)
+          cat > release/JhopanStoreVPN-linux/launch.sh << 'LAUNCHER'
+          #!/bin/bash
+          DIR="$(cd "$(dirname "$0")" && pwd)"
+          cd "$DIR"
+          nohup ./JhopanStoreVPN > /dev/null 2>&1 &
+          disown
+          LAUNCHER
+          sed -i 's/^          //' release/JhopanStoreVPN-linux/launch.sh
+          chmod +x release/JhopanStoreVPN-linux/launch.sh
+
+          # Create .desktop file
+          cat > release/JhopanStoreVPN-linux/JhopanStoreVPN.desktop << 'DESKTOP'
+          [Desktop Entry]
+          Name=JhopanStoreVPN
+          Comment=Lightweight VLESS VPN Client
+          Exec=bash -c 'cd "$(dirname "%k")" && nohup ./JhopanStoreVPN > /dev/null 2>&1 &'
+          Icon=assets/icon256.png
+          Terminal=false
+          Type=Application
+          Categories=Network;VPN;
+          DESKTOP
+          sed -i 's/^          //' release/JhopanStoreVPN-linux/JhopanStoreVPN.desktop
+          chmod +x release/JhopanStoreVPN-linux/JhopanStoreVPN.desktop
+
           cd release && tar czf JhopanStoreVPN-linux.tar.gz JhopanStoreVPN-linux
 
       - name: Upload Artifact
@@ -116,15 +142,49 @@ jobs:
 
       - name: Package
         run: |
-          mkdir -p release/JhopanStoreVPN-macos/assets
-          cp JhopanStoreVPN release/JhopanStoreVPN-macos/
-          cp xray release/JhopanStoreVPN-macos/
-          cp assets/background.png release/JhopanStoreVPN-macos/assets/
-          cp assets/icon64.png release/JhopanStoreVPN-macos/assets/
-          cp assets/icon256.png release/JhopanStoreVPN-macos/assets/
-          chmod +x release/JhopanStoreVPN-macos/JhopanStoreVPN
-          chmod +x release/JhopanStoreVPN-macos/xray
-          cd release && tar czf JhopanStoreVPN-macos.tar.gz JhopanStoreVPN-macos
+          # Create macOS .app bundle
+          APP="release/JhopanStoreVPN.app"
+          mkdir -p "$APP/Contents/MacOS"
+          mkdir -p "$APP/Contents/Resources/assets"
+
+          cp JhopanStoreVPN "$APP/Contents/MacOS/"
+          cp xray "$APP/Contents/MacOS/"
+          cp assets/background.png "$APP/Contents/Resources/assets/"
+          cp assets/icon64.png "$APP/Contents/Resources/assets/"
+          cp assets/icon256.png "$APP/Contents/Resources/assets/"
+          chmod +x "$APP/Contents/MacOS/JhopanStoreVPN"
+          chmod +x "$APP/Contents/MacOS/xray"
+
+          # Create Info.plist
+          cat > "$APP/Contents/Info.plist" << 'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleExecutable</key>
+            <string>JhopanStoreVPN</string>
+            <key>CFBundleIdentifier</key>
+            <string>com.jhopanstorevpn.app</string>
+            <key>CFBundleName</key>
+            <string>JhopanStoreVPN</string>
+            <key>CFBundleDisplayName</key>
+            <string>JhopanStoreVPN</string>
+            <key>CFBundleVersion</key>
+            <string>1.0.0</string>
+            <key>CFBundleShortVersionString</key>
+            <string>1.0.0</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+            <key>LSMinimumSystemVersion</key>
+            <string>11.0</string>
+            <key>NSHighResolutionCapable</key>
+            <true/>
+          </dict>
+          </plist>
+          PLIST
+          sed -i '' 's/^          //' "$APP/Contents/Info.plist"
+
+          cd release && tar czf JhopanStoreVPN-macos.tar.gz JhopanStoreVPN.app
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
