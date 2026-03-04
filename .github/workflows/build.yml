@@ -1,0 +1,163 @@
+name: Build JhopanStoreVPN
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+
+      - name: Install MinGW
+        run: choco install mingw -y
+
+      - name: Download Xray-core
+        shell: pwsh
+        run: |
+          $release = Invoke-RestMethod "https://api.github.com/repos/XTLS/Xray-core/releases/latest"
+          $asset = $release.assets | Where-Object { $_.name -like "Xray-windows-64.zip" }
+          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile xray.zip
+          Expand-Archive xray.zip -DestinationPath xray-tmp
+          Move-Item xray-tmp/xray.exe ./xray.exe
+
+      - name: Build
+        shell: pwsh
+        run: |
+          $env:CGO_ENABLED = "1"
+          go build -v -ldflags="-s -w" -o JhopanStoreVPN.exe .
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path release/JhopanStoreVPN-windows
+          Copy-Item JhopanStoreVPN.exe release/JhopanStoreVPN-windows/
+          Copy-Item xray.exe release/JhopanStoreVPN-windows/
+          New-Item -ItemType Directory -Force -Path release/JhopanStoreVPN-windows/assets
+          Copy-Item assets/background.png release/JhopanStoreVPN-windows/assets/
+          Copy-Item assets/icon64.png release/JhopanStoreVPN-windows/assets/
+          Copy-Item assets/icon256.png release/JhopanStoreVPN-windows/assets/
+          Compress-Archive -Path release/JhopanStoreVPN-windows -DestinationPath release/JhopanStoreVPN-windows.zip
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: JhopanStoreVPN-windows
+          path: release/JhopanStoreVPN-windows.zip
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc pkg-config libgl1-mesa-dev xorg-dev
+
+      - name: Download Xray-core
+        run: |
+          RELEASE_URL=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases/latest | grep -o 'https://[^"]*Xray-linux-64.zip')
+          curl -L -o xray.zip "$RELEASE_URL"
+          unzip xray.zip xray -d .
+          chmod +x xray
+
+      - name: Build
+        run: |
+          CGO_ENABLED=1 go build -v -ldflags="-s -w" -o JhopanStoreVPN .
+
+      - name: Package
+        run: |
+          mkdir -p release/JhopanStoreVPN-linux/assets
+          cp JhopanStoreVPN release/JhopanStoreVPN-linux/
+          cp xray release/JhopanStoreVPN-linux/
+          cp assets/background.png release/JhopanStoreVPN-linux/assets/
+          cp assets/icon64.png release/JhopanStoreVPN-linux/assets/
+          cp assets/icon256.png release/JhopanStoreVPN-linux/assets/
+          chmod +x release/JhopanStoreVPN-linux/JhopanStoreVPN
+          chmod +x release/JhopanStoreVPN-linux/xray
+          cd release && tar czf JhopanStoreVPN-linux.tar.gz JhopanStoreVPN-linux
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: JhopanStoreVPN-linux
+          path: release/JhopanStoreVPN-linux.tar.gz
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+
+      - name: Download Xray-core
+        run: |
+          ARCH=$(uname -m)
+          if [ "$ARCH" = "arm64" ]; then
+            RELEASE_URL=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases/latest | grep -o 'https://[^"]*Xray-macos-arm64-v8a.zip')
+          else
+            RELEASE_URL=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases/latest | grep -o 'https://[^"]*Xray-macos-64.zip')
+          fi
+          curl -L -o xray.zip "$RELEASE_URL"
+          unzip xray.zip xray -d .
+          chmod +x xray
+
+      - name: Build
+        run: |
+          CGO_ENABLED=1 go build -v -ldflags="-s -w" -o JhopanStoreVPN .
+
+      - name: Package
+        run: |
+          mkdir -p release/JhopanStoreVPN-macos/assets
+          cp JhopanStoreVPN release/JhopanStoreVPN-macos/
+          cp xray release/JhopanStoreVPN-macos/
+          cp assets/background.png release/JhopanStoreVPN-macos/assets/
+          cp assets/icon64.png release/JhopanStoreVPN-macos/assets/
+          cp assets/icon256.png release/JhopanStoreVPN-macos/assets/
+          chmod +x release/JhopanStoreVPN-macos/JhopanStoreVPN
+          chmod +x release/JhopanStoreVPN-macos/xray
+          cd release && tar czf JhopanStoreVPN-macos.tar.gz JhopanStoreVPN-macos
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: JhopanStoreVPN-macos
+          path: release/JhopanStoreVPN-macos.tar.gz
+
+  release:
+    needs: [build-windows, build-linux, build-macos]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/JhopanStoreVPN-windows/JhopanStoreVPN-windows.zip
+            artifacts/JhopanStoreVPN-linux/JhopanStoreVPN-linux.tar.gz
+            artifacts/JhopanStoreVPN-macos/JhopanStoreVPN-macos.tar.gz
+          generate_release_notes: true

@@ -1,0 +1,46 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+JhopanStoreVPN
+jhovpn
+
+# Build output
+dist/
+release/
+build/
+
+# Xray binary (downloaded at build time)
+/xray
+/xray.exe
+
+# Test/debug files
+*.log
+*.json
+!go.mod
+test_*.json
+xray_*.log
+
+# Temp files
+*.tmp
+*.bak
+*.swp
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Go
+vendor/
+
+# Uploaded/temp images (not assets)
+file_*.png
