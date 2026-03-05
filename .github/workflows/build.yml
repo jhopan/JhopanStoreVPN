@@ -296,32 +296,32 @@ jobs:
           # Install gomobile
           go install golang.org/x/mobile/cmd/gomobile@latest
 
-          # Clone libXray source (Go wrapper files)
+          # Clone libXray wrapper source
           git clone --depth 1 https://github.com/XTLS/libXray /tmp/libxray-src
 
-          # Clone Xray-core MAIN — its go.mod pins gvisor v0.0.0-20260122175437
-          # which fixes the Go 1.26 build-tag conflict present in v26.1.23
+          # Clone Xray-core main — go.mod pins gvisor v0.0.0-20260122175437
+          # (fixes the Go 1.26 build-tag redeclaration bug in v26.1.23)
           git clone --depth 1 https://github.com/XTLS/Xray-core /tmp/Xray-core-libXray
 
           cd /tmp/libxray-src
 
-          # Recreate go.mod pointing to local Xray-core clone
-          # (mirrors what the XTLS build script's init_go_env() does,
-          #  but skips download_geo which is only needed at runtime)
+          # Replicate XTLS build script's init_go_env() — setup go.mod
           rm -f go.mod go.sum
           go mod init github.com/xtls/libxray
           go mod edit -replace github.com/xtls/xray-core=../Xray-core-libXray
+
+          # Replicate XTLS build script's prepare_gomobile() — add x/mobile to go.mod
+          # This is the critical step that was missing: without it, gomobile bind
+          # cannot find golang.org/x/mobile/bind and fails with "no Go package"
+          go get golang.org/x/mobile/cmd/gomobile@latest
+
           go mod tidy
 
-          # Init gomobile cross-compilation toolchain
+          # Init gomobile's Android cross-compilation toolchain
           gomobile init
 
-          # Build the AAR
-          gomobile bind \
-            -target android \
-            -androidapi 21 \
-            -o libXray.aar \
-            .
+          # Build the AAR (gomobile bind in current dir = github.com/xtls/libxray)
+          gomobile bind -target android -androidapi 21 -o libXray.aar .
 
           if [ ! -f libXray.aar ]; then
             echo "✗ Build failed — libXray.aar not found"
