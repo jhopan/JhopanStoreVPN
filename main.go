@@ -325,6 +325,72 @@ func main() {
 	// ---- Build Main Page ----
 	mainPage = appUI.NewMainPage(doConnect, doDisconnect, openSettings, importClipboard, bgResource)
 
+	// ---- Load saved preferences ----
+	prefs := a.Preferences()
+	if v := prefs.String("address"); v != "" {
+		mainPage.AddressEntry.SetText(v)
+	}
+	if v := prefs.String("uuid"); v != "" {
+		mainPage.UUIDEntry.SetText(v)
+	}
+	if v := prefs.String("path"); v != "" {
+		settingsPage.PathEntry.SetText(v)
+	}
+	if v := prefs.String("sni"); v != "" {
+		settingsPage.SNIEntry.SetText(v)
+	}
+	if v := prefs.String("host"); v != "" {
+		settingsPage.HostEntry.SetText(v)
+	}
+	if v := prefs.String("dns1"); v != "" {
+		settingsPage.DNS1Entry.SetText(v)
+	}
+	if v := prefs.String("dns2"); v != "" {
+		settingsPage.DNS2Entry.SetText(v)
+	}
+	if v := prefs.String("ping_url"); v != "" {
+		settingsPage.PingURLEntry.SetText(v)
+	}
+	if prefs.StringWithFallback("system_tray_set", "no") == "yes" {
+		settingsPage.SystemTrayCheck.SetChecked(prefs.Bool("system_tray"))
+	}
+	if prefs.StringWithFallback("auto_reconnect_set", "no") == "yes" {
+		settingsPage.AutoReconnectCheck.SetChecked(prefs.Bool("auto_reconnect"))
+	}
+	if prefs.StringWithFallback("allow_insecure_set", "no") == "yes" {
+		settingsPage.AllowInsecureCheck.SetChecked(prefs.Bool("allow_insecure"))
+	}
+
+	// ---- Auto-save on every field change ----
+	savePrefs := func() {
+		prefs.SetString("address", mainPage.AddressEntry.Text)
+		prefs.SetString("uuid", mainPage.UUIDEntry.Text)
+		prefs.SetString("path", settingsPage.PathEntry.Text)
+		prefs.SetString("sni", settingsPage.SNIEntry.Text)
+		prefs.SetString("host", settingsPage.HostEntry.Text)
+		prefs.SetString("dns1", settingsPage.DNS1Entry.Text)
+		prefs.SetString("dns2", settingsPage.DNS2Entry.Text)
+		prefs.SetString("ping_url", settingsPage.PingURLEntry.Text)
+		prefs.SetBool("system_tray", settingsPage.SystemTrayCheck.Checked)
+		prefs.SetString("system_tray_set", "yes")
+		prefs.SetBool("auto_reconnect", settingsPage.AutoReconnectCheck.Checked)
+		prefs.SetString("auto_reconnect_set", "yes")
+		prefs.SetBool("allow_insecure", settingsPage.AllowInsecureCheck.Checked)
+		prefs.SetString("allow_insecure_set", "yes")
+	}
+
+	mainPage.AddressEntry.OnChanged = func(_ string) { savePrefs() }
+	mainPage.UUIDEntry.OnChanged = func(_ string) { savePrefs() }
+	settingsPage.PathEntry.OnChanged = func(_ string) { savePrefs() }
+	settingsPage.SNIEntry.OnChanged = func(_ string) { savePrefs() }
+	settingsPage.HostEntry.OnChanged = func(_ string) { savePrefs() }
+	settingsPage.DNS1Entry.OnChanged = func(_ string) { savePrefs() }
+	settingsPage.DNS2Entry.OnChanged = func(_ string) { savePrefs() }
+	settingsPage.PingURLEntry.OnChanged = func(_ string) { savePrefs() }
+	settingsPage.SystemTrayCheck.OnChanged = func(_ bool) { savePrefs() }
+	settingsPage.AutoReconnectCheck.OnChanged = func(_ bool) { savePrefs() }
+	settingsPage.AllowInsecureCheck.OnChanged = func(_ bool) { savePrefs() }
+
 	w.SetContent(mainPage.Container)
 
 	// ---- System Tray ----
@@ -348,6 +414,7 @@ func main() {
 
 	// Window close behavior depends on system tray toggle
 	w.SetCloseIntercept(func() {
+		savePrefs()
 		if settingsPage.IsSystemTray() {
 			w.Hide()
 			visible = false
@@ -358,6 +425,7 @@ func main() {
 	})
 
 	w.SetOnClosed(func() {
+		savePrefs()
 		doDisconnect()
 	})
 
