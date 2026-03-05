@@ -90,6 +90,9 @@ object Tun2socksManager {
                     } catch (_: Exception) { /* stream closed */ }
                     try { readPfd.close() } catch (_: Exception) {}
                     Log.w(TAG, "tun2socks output stream ended")
+                }.apply {
+                    isDaemon = true
+                    name = "tun2socks-log"
                 }.start()
             }
 

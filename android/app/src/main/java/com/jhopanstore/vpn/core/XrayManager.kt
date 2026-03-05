@@ -5,8 +5,6 @@ import android.util.Log
 import libXray.LibXray
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.File
-import java.io.FileOutputStream
 import java.net.Inet4Address
 import java.net.InetAddress
 
@@ -28,10 +26,13 @@ import java.net.InetAddress
 object XrayManager {
     private const val TAG = "XrayManager"
     const val SOCKS_PORT = 10808
-    const val HTTP_PORT = 10809
 
     /** Called when Xray state changes to stopped unexpectedly. */
     var onProcessDied: (() -> Unit)? = null
+
+    /** When true, Xray SOCKS5 inbound listens on 0.0.0.0 (hotspot sharing). */
+    @Volatile
+    var hotspotSharing: Boolean = false
 
     // Track whether we intentionally stopped (vs unexpected death)
     @Volatile
@@ -90,26 +91,16 @@ object XrayManager {
 
         val root = JSONObject()
 
-        root.put("log", JSONObject().apply { put("loglevel", "info") })
+        root.put("log", JSONObject().apply { put("loglevel", "none") })
 
         // -- inbounds --
         root.put("inbounds", JSONArray().apply {
             put(JSONObject().apply {
                 put("tag", "socks-in")
                 put("port", SOCKS_PORT)
-                put("listen", "127.0.0.1")
+                put("listen", if (hotspotSharing) "0.0.0.0" else "127.0.0.1")
                 put("protocol", "socks")
                 put("settings", JSONObject().apply { put("udp", true) })
-                put("sniffing", JSONObject().apply {
-                    put("enabled", true)
-                    put("destOverride", JSONArray().apply { put("http"); put("tls") })
-                })
-            })
-            put(JSONObject().apply {
-                put("tag", "http-in")
-                put("port", HTTP_PORT)
-                put("listen", "127.0.0.1")
-                put("protocol", "http")
             })
         })
 
@@ -205,34 +196,7 @@ object XrayManager {
             put("queryStrategy", "UseIPv4")
         })
 
-        return root.toString(2)
-    }
-
-    /**
-     * Extract geo data files (geoip.dat, geosite.dat) from assets to filesDir.
-     * These are required by Xray-core for routing rules.
-     */
-    private fun ensureGeoData(context: Context): String {
-        val datDir = context.filesDir.absolutePath
-        val geoFiles = listOf("geoip.dat", "geosite.dat")
-
-        for (file in geoFiles) {
-            val target = File(datDir, file)
-            if (target.exists()) {
-                Log.d(TAG, "Geo file already exists: $file (${target.length() / 1024} KB)")
-                continue
-            }
-            try {
-                context.assets.open(file).use { inp ->
-                    FileOutputStream(target).use { out -> inp.copyTo(out) }
-                }
-                Log.i(TAG, "Extracted $file to $datDir (${target.length() / 1024} KB)")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to extract $file: ${e.message}")
-            }
-        }
-
-        return datDir
+        return root.toString()
     }
 
     /**
@@ -266,9 +230,8 @@ object XrayManager {
             stop()
             intentionalStop = false
 
-            // Extract geo data if needed
-            val datDir = ensureGeoData(context)
-            val mphCachePath = File(context.cacheDir, "mph_cache").absolutePath
+            val datDir = context.filesDir.absolutePath
+            val mphCachePath = context.cacheDir.absolutePath + "/mph_cache"
 
             // Generate Xray config JSON
             val configJson = buildConfig(cfg, dns1, dns2, resolvedIp)
@@ -300,9 +263,9 @@ object XrayManager {
             // Monitor Xray state in background for unexpected death
             monitorThread = Thread {
                 try {
-                    Thread.sleep(2000) // initial delay
+                    Thread.sleep(3000) // initial delay — let Xray fully stabilize
                     while (!intentionalStop && LibXray.getXrayState()) {
-                        Thread.sleep(3000) // check every 3 seconds
+                        Thread.sleep(5000) // check every 5 seconds — saves CPU wake cycles
                     }
                     if (!intentionalStop) {
                         Log.w(TAG, "Xray stopped unexpectedly")

@@ -6,12 +6,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.WifiTethering
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -25,17 +29,32 @@ fun MainScreen(
     viewModel: MainViewModel,
     onConnect: () -> Unit,
     onDisconnect: () -> Unit,
-    onImportClipboard: () -> Unit
+    onImportClipboard: () -> Unit,
+    onOpenHotspotSettings: () -> Unit,
+    onToggleProxy: () -> Unit,
+    onCopyProxy: () -> Unit,
+    onOpenBatterySettings: () -> Unit
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("JhopanStoreVPN", fontWeight = FontWeight.Bold) },
                 actions = {
-                    IconButton(onClick = onImportClipboard) {
+                    IconButton(
+                        onClick = onImportClipboard,
+                        enabled = !viewModel.isConnected
+                    ) {
                         Icon(Icons.Default.ContentPaste, contentDescription = "Paste")
                     }
-                    IconButton(onClick = { viewModel.showSettings = !viewModel.showSettings }) {
+                    IconButton(onClick = { viewModel.showHotspot = !viewModel.showHotspot; viewModel.showSettings = false }) {
+                        Icon(
+                            Icons.Default.WifiTethering,
+                            contentDescription = "Bagikan VPN",
+                            tint = if (viewModel.isProxySharingActive) Color(0xFF4CAF50)
+                                   else LocalContentColor.current
+                        )
+                    }
+                    IconButton(onClick = { viewModel.showSettings = !viewModel.showSettings; viewModel.showHotspot = false }) {
                         Icon(Icons.Default.Settings, contentDescription = "Settings")
                     }
                 },
@@ -47,17 +66,25 @@ fun MainScreen(
             )
         }
     ) { padding ->
-        if (viewModel.showSettings) {
-            SettingsScreen(
+        when {
+            viewModel.showHotspot -> HotspotScreen(
+                viewModel = viewModel,
+                onClose = { viewModel.showHotspot = false },
+                onToggleProxy = onToggleProxy,
+                onCheckHotspot = { viewModel.checkHotspot() },
+                modifier = Modifier.padding(padding)
+            )
+            viewModel.showSettings -> SettingsScreen(
                 viewModel = viewModel,
                 onClose = { viewModel.showSettings = false },
                 modifier = Modifier.padding(padding)
             )
-        } else {
-            MainContent(
+            else -> MainContent(
                 viewModel = viewModel,
                 onConnect = onConnect,
                 onDisconnect = onDisconnect,
+                onCopyProxy = onCopyProxy,
+                onOpenBatterySettings = onOpenBatterySettings,
                 modifier = Modifier.padding(padding)
             )
         }
@@ -69,6 +96,8 @@ private fun MainContent(
     viewModel: MainViewModel,
     onConnect: () -> Unit,
     onDisconnect: () -> Unit,
+    onCopyProxy: () -> Unit,
+    onOpenBatterySettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -79,6 +108,42 @@ private fun MainContent(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(modifier = Modifier.height(12.dp))
+
+        // Warning: battery optimization masih aktif
+        if (viewModel.isBatteryOptimized) {
+            Surface(
+                color = Color(0xFFFFF3CD),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = Color(0xFFF57C00),
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "Pembatasan daya aktif. VPN bisa terputus saat layar mati.",
+                        fontSize = 12.sp,
+                        color = Color(0xFF5D4037),
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    TextButton(
+                        onClick = onOpenBatterySettings,
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
+                    ) {
+                        Text("Perbaiki", fontSize = 12.sp, color = Color(0xFFF57C00))
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+        }
 
         // Logo
         Image(
@@ -191,5 +256,44 @@ private fun MainContent(
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
         )
+
+        // Proxy sharing info row — tampil hanya saat VPN konek + proxy aktif
+        if (viewModel.isConnected && viewModel.isProxySharingActive && viewModel.hotspotIp.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Surface(
+                color = Color(0xFF4CAF50).copy(alpha = 0.12f),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.WifiTethering,
+                        contentDescription = null,
+                        tint = Color(0xFF4CAF50),
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "Proxy: ${viewModel.hotspotIp}:10808",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(
+                        onClick = onCopyProxy,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.ContentCopy,
+                            contentDescription = "Salin",
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
+        }
     }
 }

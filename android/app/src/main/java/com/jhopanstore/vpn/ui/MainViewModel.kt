@@ -1,24 +1,29 @@
 package com.jhopanstore.vpn.ui
 
+import android.app.Application
 import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.jhopanstore.vpn.core.VlessConfig
 import com.jhopanstore.vpn.core.VlessParser
+import com.jhopanstore.vpn.core.XrayManager
 import com.jhopanstore.vpn.service.JhopanVpnService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.net.Inet4Address
 import java.net.HttpURLConnection
 import java.net.InetSocketAddress
+import java.net.NetworkInterface
 import java.net.Proxy
 import java.net.URL
 
-class MainViewModel : ViewModel() {
+class MainViewModel(application: Application) : AndroidViewModel(application) {
+    private val appContext = application.applicationContext
 
     // Connection fields — address includes port, e.g. "example.com:443"
     var address by mutableStateOf("")
@@ -40,6 +45,15 @@ class MainViewModel : ViewModel() {
     var statusText by mutableStateOf("Disconnected")
     var pingResult by mutableStateOf("-")
     var showSettings by mutableStateOf(false)
+
+    // Hotspot sharing state
+    var showHotspot by mutableStateOf(false)
+    var isHotspotDetected by mutableStateOf(false)
+    var hotspotIp by mutableStateOf("")
+    var isProxySharingActive by mutableStateOf(false)
+
+    // Battery optimization warning
+    var isBatteryOptimized by mutableStateOf(false)
 
     /** Split "host:port" input; defaults port to 443 */
     private fun parseAddress(): Pair<String, Int> {
@@ -116,6 +130,78 @@ class MainViewModel : ViewModel() {
         isConnecting = false
         statusText = "Disconnected"
         pingResult = "-"
+        // reset proxy sharing when VPN disconnects
+        isProxySharingActive = false
+        XrayManager.hotspotSharing = false
+    }
+
+    // --- Hotspot Sharing ---
+
+    /** Cek apakah hotspot aktif berdasarkan NetworkInterface. Panggil dari onResume. */
+    fun checkHotspot() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val ip = detectHotspotIp()
+            withContext(Dispatchers.Main) {
+                hotspotIp = ip ?: ""
+                isHotspotDetected = ip != null
+                // Kalau hotspot dimatikan saat proxy sharing aktif, reset
+                if (!isHotspotDetected && isProxySharingActive) {
+                    isProxySharingActive = false
+                    XrayManager.hotspotSharing = false
+                }
+            }
+        }
+    }
+
+    private fun detectHotspotIp(): String? {
+        return try {
+            val interfaces = NetworkInterface.getNetworkInterfaces()?.toList() ?: return null
+            for (iface in interfaces) {
+                if (!iface.isUp || iface.isLoopback) continue
+                val name = iface.name.lowercase()
+                if (name.startsWith("tun") || name.startsWith("rmnet") ||
+                    name.startsWith("ppp") || name.startsWith("dummy") ||
+                    name.startsWith("v4-") || name.startsWith("clat")) continue
+                for (addr in iface.inetAddresses.toList()) {
+                    if (addr !is Inet4Address || addr.isLoopbackAddress) continue
+                    return addr.hostAddress
+                }
+            }
+            null
+        } catch (e: Exception) { null }
+    }
+
+    /** Toggle proxy sharing on/off. Restart VPN dengan binding baru. */
+    fun toggleProxySharing(context: Context) {
+        if (!isConnected) return
+        isProxySharingActive = !isProxySharingActive
+        XrayManager.hotspotSharing = isProxySharingActive
+        restartVpn(context)
+    }
+
+    private fun restartVpn(context: Context) {
+        JhopanVpnService.stop(context)
+        isConnecting = true
+        statusText = "Reconnecting..."
+        viewModelScope.launch {
+            delay(1500)
+            val uri = buildVlessUri()
+            JhopanVpnService.start(context, uri, dns1, dns2, autoReconnect)
+            var attempts = 0
+            while (attempts < 15) {
+                delay(1000)
+                if (JhopanVpnService.isRunning) {
+                    isConnected = true
+                    isConnecting = false
+                    statusText = "Connected"
+                    return@launch
+                }
+                attempts++
+            }
+            isConnecting = false
+            isConnected = JhopanVpnService.isRunning
+            statusText = if (isConnected) "Connected" else "Reconnect failed"
+        }
     }
 
     // --- Persistence ---
@@ -147,6 +233,24 @@ class MainViewModel : ViewModel() {
         pingUrl = p.getString("pingUrl", "https://dns.google") ?: "https://dns.google"
         allowInsecure = p.getBoolean("allowInsecure", true)
         autoReconnect = p.getBoolean("autoReconnect", true)
+    }
+
+    /** Sync isConnected dengan status service yang sebenarnya. Panggil dari onResume. */
+    fun syncConnectionState() {
+        val running = JhopanVpnService.isRunning
+        if (running && !isConnected) {
+            isConnected = true
+            isConnecting = false
+            statusText = "Connected"
+            startPingLoop()
+        } else if (!running && isConnected) {
+            isConnected = false
+            isConnecting = false
+            statusText = "Disconnected"
+            pingResult = "-"
+            isProxySharingActive = false
+            XrayManager.hotspotSharing = false
+        }
     }
 
     // --- Ping ---

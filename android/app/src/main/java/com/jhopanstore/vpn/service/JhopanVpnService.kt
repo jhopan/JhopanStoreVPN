@@ -9,6 +9,7 @@ import android.content.Intent
 import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
+import android.os.PowerManager
 import android.system.Os
 import android.system.OsConstants
 import android.util.Log
@@ -72,6 +73,7 @@ class JhopanVpnService : VpnService() {
     }
 
     private var tunFd: ParcelFileDescriptor? = null
+    private var reconnectWakeLock: PowerManager.WakeLock? = null
 
     // State for auto-reconnect
     private var lastVlessUri: String? = null
@@ -121,6 +123,9 @@ class JhopanVpnService : VpnService() {
 
         Thread {
             connect(vlessUri, dns1, dns2)
+        }.apply {
+            isDaemon = true
+            name = "vpn-connect"
         }.start()
 
         return START_STICKY
@@ -145,17 +150,47 @@ class JhopanVpnService : VpnService() {
             val resolvedIp = XrayManager.resolveDomain(cfg.address)
             Log.i(TAG, "Proxy server: ${cfg.address} -> ${resolvedIp ?: "unresolved (using domain)"}")
 
-            // Set up death callback for auto-reconnect
+            // Set up death callback for auto-reconnect (loop-based, no recursion)
             XrayManager.onProcessDied = {
-                if (autoReconnect && reconnectAttempts < MAX_RECONNECT_ATTEMPTS && lastVlessUri != null) {
-                    reconnectAttempts++
-                    val delay = 3000L * reconnectAttempts
-                    Log.w(TAG, "Xray died, reconnecting in ${delay}ms (attempt $reconnectAttempts)")
-                    updateNotification("Reconnecting ($reconnectAttempts)...")
-                    Thread.sleep(delay)
-                    connect(lastVlessUri!!, lastDns1, lastDns2)
+                if (autoReconnect && lastVlessUri != null) {
+                    Thread {
+                        // Cegah CPU sleep saat proses reconnect di Doze mode
+                        val pm = getSystemService(POWER_SERVICE) as PowerManager
+                        val wl = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "jhopanvpn:reconnect")
+                        wl.acquire(60_000L) // max 60 detik
+                        reconnectWakeLock = wl
+                        try {
+                            var success = false
+                            while (autoReconnect && reconnectAttempts < MAX_RECONNECT_ATTEMPTS && !success) {
+                                reconnectAttempts++
+                                val delay = 3000L * reconnectAttempts
+                                Log.w(TAG, "Xray died, reconnecting in ${delay}ms (attempt $reconnectAttempts)")
+                                updateNotification("Reconnecting ($reconnectAttempts)...")
+                                Thread.sleep(delay)
+                                // disconnect old state before reconnect
+                                Tun2socksManager.stop()
+                                try { tunFd?.close() } catch (_: Exception) {}
+                                tunFd = null
+                                connect(lastVlessUri!!, lastDns1, lastDns2)
+                                success = XrayManager.isRunning()
+                            }
+                            if (success) {
+                                reconnectAttempts = 0 // reset counter setelah berhasil
+                            } else {
+                                Log.e(TAG, "Auto-reconnect exhausted")
+                                disconnect()
+                                stopSelf()
+                            }
+                        } finally {
+                            wl.release()
+                            reconnectWakeLock = null
+                        }
+                    }.apply {
+                        isDaemon = true
+                        name = "vpn-reconnect"
+                    }.start()
                 } else {
-                    Log.e(TAG, "Auto-reconnect exhausted or disabled")
+                    Log.e(TAG, "Auto-reconnect disabled or no URI")
                     disconnect()
                     stopSelf()
                 }
@@ -186,12 +221,10 @@ class JhopanVpnService : VpnService() {
             val builder = Builder()
                 .setSession("JhopanStoreVPN")
                 .addAddress("10.0.0.2", 24)
-                .addAddress("fd00::2", 128)
                 .addRoute("0.0.0.0", 0)
-                .addRoute("::", 0)
                 .addDnsServer(dns1.ifBlank { "8.8.8.8" })
                 .addDnsServer(dns2.ifBlank { "8.8.4.4" })
-                .setMtu(1400)
+                .setMtu(1500)
 
             // Exclude our own app as defense-in-depth (protectFd handles this too)
             builder.addDisallowedApplication(packageName)
@@ -233,7 +266,7 @@ class JhopanVpnService : VpnService() {
             isRunning = true
             reconnectAttempts = 0
             Log.i(TAG, "VPN connected successfully (libXray + tun2socks)")
-            updateNotification("Connected — ${cfg.address}:${cfg.port}")
+            updateNotification("Connected")
 
         } catch (e: Exception) {
             Log.e(TAG, "Connection error", e)
@@ -245,6 +278,10 @@ class JhopanVpnService : VpnService() {
     private fun disconnect() {
         isRunning = false
         XrayManager.onProcessDied = null
+
+        // Release WakeLock jika masih aktif dari proses reconnect
+        reconnectWakeLock?.let { if (it.isHeld) it.release() }
+        reconnectWakeLock = null
 
         // Stop in reverse order: tun2socks first, then TUN, then Xray
         Tun2socksManager.stop()

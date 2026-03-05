@@ -261,35 +261,39 @@ jobs:
           java-version: "17"
           distribution: "temurin"
 
-      - name: Setup Android SDK
+      - name: Setup Android SDK + NDK
         uses: android-actions/setup-android@v3
 
-      - name: Download Xray-core for Android (arm64)
+      - name: Install NDK
+        run: sdkmanager "ndk;27.0.12077973"
+
+      - name: Download libXray.aar (Xray-core Go library)
         run: |
-          mkdir -p android/app/src/main/assets
-          curl -L -o xray.zip "https://github.com/XTLS/Xray-core/releases/latest/download/Xray-android-arm64-v8a.zip"
-          unzip -o xray.zip -d xray-tmp
-          find xray-tmp -name "xray" -not -name "*.dat" -exec cp {} android/app/src/main/assets/xray \;
-          # Also copy geoip/geosite if available
-          find xray-tmp -name "*.dat" -exec cp {} android/app/src/main/assets/ \; 2>/dev/null || true
+          mkdir -p android/app/libs
+          # XTLS/libXray — official Xray-core compiled for Android via gomobile
+          curl -L -o android/app/libs/libXray.aar \
+            "https://github.com/XTLS/libXray/releases/latest/download/libXray.aar"
+          echo "libXray.aar size: $(du -sh android/app/libs/libXray.aar | cut -f1)"
 
       - name: Build APK
         working-directory: android
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/27.0.12077973
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon
+          ./gradlew assembleRelease --no-daemon --stacktrace
 
-      - name: Sign APK (debug key for testing)
+      - name: Collect APK
         run: |
-          # Use debug keystore for unsigned -> signed
-          APK=$(find android/app/build -name "*.apk" | head -1)
-          cp "$APK" release-JhopanStoreVPN-android.apk
+          APK=$(find android/app/build/outputs/apk -name "*.apk" | head -1)
+          echo "Found APK: $APK"
+          cp "$APK" JhopanStoreVPN-android.apk
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: JhopanStoreVPN-android
-          path: release-JhopanStoreVPN-android.apk
+          path: JhopanStoreVPN-android.apk
 
   release:
     needs: [build-windows, build-linux, build-macos, build-android]
