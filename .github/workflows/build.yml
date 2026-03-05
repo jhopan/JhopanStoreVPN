@@ -265,19 +265,54 @@ jobs:
           java-version: "17"
           distribution: "temurin"
 
+      - name: Setup Go (required to build libXray.aar via gomobile)
+        uses: actions/setup-go@v5
+        with:
+          go-version: "stable"
+          cache: false
+
       - name: Setup Android SDK + NDK
         uses: android-actions/setup-android@v3
 
       - name: Install NDK
         run: sdkmanager "ndk;27.0.12077973"
 
-      - name: Download libXray.aar (Xray-core Go library)
+      - name: Cache libXray.aar
+        id: cache-libxray
+        uses: actions/cache@v4
+        with:
+          path: android/app/libs/libXray.aar
+          key: libxray-android-v26.1.23
+
+      - name: Build libXray.aar from source (gomobile)
+        if: steps.cache-libxray.outputs.cache-hit != 'true'
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/27.0.12077973
         run: |
           mkdir -p android/app/libs
-          # XTLS/libXray — official Xray-core compiled for Android via gomobile
-          curl -L -o android/app/libs/libXray.aar \
-            "https://github.com/XTLS/libXray/releases/latest/download/libXray.aar"
-          echo "libXray.aar size: $(du -sh android/app/libs/libXray.aar | cut -f1)"
+          export PATH=$PATH:$(go env GOPATH)/bin
+
+          # Install gomobile
+          go install golang.org/x/mobile/cmd/gomobile@latest
+
+          # Clone XTLS/libXray at the version matching Xray-core v26.1.23
+          git clone --depth 1 --branch v26.1.23 \
+            https://github.com/XTLS/libXray /tmp/libxray-src
+          cd /tmp/libxray-src
+
+          # Build using the official XTLS build script
+          # (clones Xray-core, sets up go.mod, runs gomobile bind)
+          python3 build/main.py android || true
+
+          # Verify AAR was produced (build script cleanup step can fail safely)
+          if [ ! -f libXray.aar ]; then
+            echo "✗ Build failed — libXray.aar not found"
+            ls -la
+            exit 1
+          fi
+
+          cp libXray.aar "$GITHUB_WORKSPACE/android/app/libs/libXray.aar"
+          echo "✓ libXray.aar: $(du -sh "$GITHUB_WORKSPACE/android/app/libs/libXray.aar" | cut -f1)"
 
       - name: Build APK
         working-directory: android
