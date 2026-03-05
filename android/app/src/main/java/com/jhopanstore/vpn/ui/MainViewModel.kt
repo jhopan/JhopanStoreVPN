@@ -13,6 +13,7 @@ import com.jhopanstore.vpn.core.XrayManager
 import com.jhopanstore.vpn.service.JhopanVpnService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.Inet4Address
@@ -38,6 +39,54 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     var allowInsecure by mutableStateOf(true)
     var autoReconnect by mutableStateOf(true)
     var pingUrl by mutableStateOf("https://dns.google")
+
+    // State
+    var isConnected by mutableStateOf(false)
+    var isConnecting by mutableStateOf(false)
+    var statusText by mutableStateOf("Disconnected")
+    var pingResult by mutableStateOf("-")
+    var showSettings by mutableStateOf(false)
+
+    init {
+        // Collect StateFlow dari service — langsung update UI tanpa polling
+        viewModelScope.launch {
+            JhopanVpnService.state.collectLatest { state ->
+                when (state) {
+                    JhopanVpnService.VpnState.CONNECTED -> {
+                        isConnected = true
+                        isConnecting = false
+                        statusText = "Connected"
+                        startPingLoop()
+                    }
+                    JhopanVpnService.VpnState.CONNECTING -> {
+                        isConnecting = true
+                        isConnected = false
+                        statusText = "Connecting..."
+                    }
+                    JhopanVpnService.VpnState.FAILED -> {
+                        isConnected = false
+                        isConnecting = false
+                        statusText = "Connection failed"
+                        pingResult = "-"
+                        isProxySharingActive = false
+                        XrayManager.hotspotSharing = false
+                    }
+                    JhopanVpnService.VpnState.DISCONNECTED -> {
+                        // Hanya update jika memang sedang connected/connecting
+                        // Hindari reset state saat app baru buka (initial DISCONNECTED)
+                        if (isConnected || isConnecting) {
+                            isConnected = false
+                            isConnecting = false
+                            statusText = "Disconnected"
+                            pingResult = "-"
+                            isProxySharingActive = false
+                            XrayManager.hotspotSharing = false
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     // State
     var isConnected by mutableStateOf(false)
@@ -98,30 +147,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
 
+        // State CONNECTING akan diset oleh StateFlow collector saat service kirim sinyal
         isConnecting = true
         statusText = "Connecting..."
 
         val uri = buildVlessUri()
         JhopanVpnService.start(context, uri, dns1, dns2, autoReconnect)
-
-        // Poll for connection status
-        viewModelScope.launch {
-            var attempts = 0
-            while (attempts < 20) {
-                delay(1000)
-                if (JhopanVpnService.isRunning) {
-                    isConnected = true
-                    isConnecting = false
-                    statusText = "Connected"
-                    startPingLoop()
-                    return@launch
-                }
-                attempts++
-            }
-            isConnecting = false
-            isConnected = JhopanVpnService.isRunning
-            statusText = if (isConnected) "Connected" else "Connection failed"
-        }
+        // Tidak perlu polling — StateFlow di init{} yang update UI
     }
 
     fun disconnect(context: Context) {
@@ -235,15 +267,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         autoReconnect = p.getBoolean("autoReconnect", true)
     }
 
-    /** Sync isConnected dengan status service yang sebenarnya. Panggil dari onResume. */
+    /** Sync isConnected dengan status service yang sebenarnya. Panggil dari onResume.
+     *  StateFlow sudah handle update real-time, ini hanya untuk kasus
+     *  app dibuka ulang saat VPN service masih jalan di background.
+     */
     fun syncConnectionState() {
         val running = JhopanVpnService.isRunning
-        if (running && !isConnected) {
+        // Hanya sync jika ada ketidaksesuaian dan TIDAK sedang dalam proses connecting
+        if (running && !isConnected && !isConnecting) {
             isConnected = true
             isConnecting = false
             statusText = "Connected"
             startPingLoop()
         } else if (!running && isConnected) {
+            // Service mati tapi UI masih showing connected
             isConnected = false
             isConnecting = false
             statusText = "Disconnected"
@@ -251,6 +288,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             isProxySharingActive = false
             XrayManager.hotspotSharing = false
         }
+        // Jika isConnecting == true dan running == false: biarkan StateFlow yang handle
     }
 
     // --- Ping ---

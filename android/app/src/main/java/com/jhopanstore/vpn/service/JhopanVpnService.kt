@@ -18,6 +18,8 @@ import com.jhopanstore.vpn.R
 import com.jhopanstore.vpn.core.Tun2socksManager
 import com.jhopanstore.vpn.core.VlessConfig
 import com.jhopanstore.vpn.core.XrayManager
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import libXray.LibXray
 import java.io.IOException
 
@@ -35,6 +37,8 @@ import java.io.IOException
  */
 class JhopanVpnService : VpnService() {
 
+    enum class VpnState { DISCONNECTED, CONNECTING, CONNECTED, FAILED }
+
     companion object {
         private const val TAG = "JhopanVpnService"
         private const val CHANNEL_ID = "jhopan_vpn_channel"
@@ -48,6 +52,15 @@ class JhopanVpnService : VpnService() {
 
         @Volatile
         var isRunning = false
+            private set
+
+        // StateFlow untuk UI — ViewModel collect ini, tidak perlu polling
+        private val _state = MutableStateFlow(VpnState.DISCONNECTED)
+        val state: StateFlow<VpnState> = _state
+
+        // Flag untuk cancel background thread saat stop dipanggil
+        @Volatile
+        var isStopping = false
             private set
 
         fun start(context: Context, vlessUri: String, dns1: String, dns2: String, autoReconnect: Boolean) {
@@ -103,6 +116,7 @@ class JhopanVpnService : VpnService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
+            isStopping = true
             autoReconnect = false
             disconnect()
             stopSelf()
@@ -118,6 +132,10 @@ class JhopanVpnService : VpnService() {
         val dns1 = intent.getStringExtra(EXTRA_DNS1) ?: "8.8.8.8"
         val dns2 = intent.getStringExtra(EXTRA_DNS2) ?: "8.8.4.4"
         autoReconnect = intent.getBooleanExtra(EXTRA_AUTO_RECONNECT, false)
+
+        // Reset flag setiap kali ada koneksi baru
+        isStopping = false
+        _state.value = VpnState.CONNECTING
 
         startForeground(NOTIFICATION_ID, buildNotification("Connecting..."))
 
@@ -138,9 +156,12 @@ class JhopanVpnService : VpnService() {
             lastDns1 = dns1
             lastDns2 = dns2
 
+            if (isStopping) return
+
             val parseResult = com.jhopanstore.vpn.core.VlessParser.parse(vlessUri)
             val cfg = parseResult.getOrElse {
                 Log.e(TAG, "Failed to parse VLESS URI", it)
+                _state.value = VpnState.FAILED
                 updateNotification("Parse error")
                 stopSelf()
                 return
@@ -197,6 +218,8 @@ class JhopanVpnService : VpnService() {
             }
 
             // Start Xray core via libXray (in-process)
+            if (isStopping) return
+
             val started = XrayManager.start(this, cfg, dns1, dns2, resolvedIp)
             if (!started) {
                 Log.e(TAG, "Failed to start Xray")
@@ -209,6 +232,7 @@ class JhopanVpnService : VpnService() {
                     connect(vlessUri, dns1, dns2)
                     return
                 }
+                _state.value = VpnState.FAILED
                 updateNotification("Xray start failed")
                 stopSelf()
                 return
@@ -229,10 +253,16 @@ class JhopanVpnService : VpnService() {
             // Exclude our own app as defense-in-depth (protectFd handles this too)
             builder.addDisallowedApplication(packageName)
 
+            if (isStopping) {
+                XrayManager.stop()
+                return
+            }
+
             tunFd = builder.establish()
             if (tunFd == null) {
                 Log.e(TAG, "Failed to establish TUN interface")
                 XrayManager.stop()
+                _state.value = VpnState.FAILED
                 updateNotification("TUN failed")
                 stopSelf()
                 return
@@ -258,18 +288,27 @@ class JhopanVpnService : VpnService() {
                 XrayManager.stop()
                 tunFd?.close()
                 tunFd = null
+                _state.value = VpnState.FAILED
                 updateNotification("tun2socks failed")
                 stopSelf()
                 return
             }
 
+            // Cek sekali lagi: kalau isStopping, jangan set CONNECTED
+            if (isStopping) {
+                disconnect()
+                return
+            }
+
             isRunning = true
             reconnectAttempts = 0
+            _state.value = VpnState.CONNECTED
             Log.i(TAG, "VPN connected successfully (libXray + tun2socks)")
             updateNotification("Connected")
 
         } catch (e: Exception) {
             Log.e(TAG, "Connection error", e)
+            if (!isStopping) _state.value = VpnState.FAILED
             disconnect()
             stopSelf()
         }
@@ -294,6 +333,7 @@ class JhopanVpnService : VpnService() {
         }
         tunFd = null
 
+        _state.value = VpnState.DISCONNECTED
         stopForeground(STOP_FOREGROUND_REMOVE)
         Log.i(TAG, "VPN disconnected")
     }
