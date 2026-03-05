@@ -293,34 +293,30 @@ jobs:
           export GOPATH=$(go env GOPATH)
           export PATH=$PATH:$GOPATH/bin
 
-          # Install gomobile
+          # Install gomobile system-wide
           go install golang.org/x/mobile/cmd/gomobile@latest
 
-          # Clone libXray wrapper source
+          # Clone libXray wrapper source and Xray-core (main = fixed gvisor Go1.26)
           git clone --depth 1 https://github.com/XTLS/libXray /tmp/libxray-src
-
-          # Clone Xray-core main — go.mod pins gvisor v0.0.0-20260122175437
-          # (fixes the Go 1.26 build-tag redeclaration bug in v26.1.23)
           git clone --depth 1 https://github.com/XTLS/Xray-core /tmp/Xray-core-libXray
 
           cd /tmp/libxray-src
 
-          # Replicate XTLS build script's init_go_env() — setup go.mod
+          # Step 1: init_go_env (mirrors XTLS build.py)
           rm -f go.mod go.sum
           go mod init github.com/xtls/libxray
           go mod edit -replace github.com/xtls/xray-core=../Xray-core-libXray
-
-          # Replicate XTLS build script's prepare_gomobile() — add x/mobile to go.mod
-          # This is the critical step that was missing: without it, gomobile bind
-          # cannot find golang.org/x/mobile/bind and fails with "no Go package"
-          go get golang.org/x/mobile/cmd/gomobile@latest
-
           go mod tidy
 
-          # Init gomobile's Android cross-compilation toolchain
+          # Step 2: prepare_gomobile (mirrors XTLS build.py)
+          # MUST be AFTER go mod tidy — tidy would remove x/mobile if added before
+          go get golang.org/x/mobile/cmd/gomobile@latest
+          go get google.golang.org/genproto@latest
+
+          # Init gomobile Android toolchain
           gomobile init
 
-          # Build the AAR (gomobile bind in current dir = github.com/xtls/libxray)
+          # Build AAR
           gomobile bind -target android -androidapi 21 -o libXray.aar .
 
           if [ ! -f libXray.aar ]; then
