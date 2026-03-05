@@ -140,6 +140,12 @@ private fun MainContent(
                     ) {
                         Text("Perbaiki", fontSize = 12.sp, color = Color(0xFFF57C00))
                     }
+                    TextButton(
+                        onClick = { viewModel.isBatteryOptimized = false },
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                    ) {
+                        Text("×", fontSize = 16.sp, color = Color(0xFF999999))
+                    }
                 }
             }
             Spacer(modifier = Modifier.height(12.dp))

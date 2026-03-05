@@ -122,7 +122,10 @@ class MainActivity : ComponentActivity() {
         pendingViewModel?.checkHotspot()
         pendingViewModel?.syncConnectionState()
         val pm = getSystemService(POWER_SERVICE) as PowerManager
-        pendingViewModel?.isBatteryOptimized = !pm.isIgnoringBatteryOptimizations(packageName)
+        val isIgnoring = pm.isIgnoringBatteryOptimizations(packageName)
+        // Tampilkan warning banner hanya jika belum dibebaskan dari optimasi baterai
+        // User bisa dismiss per-sesi dengan tombol ×
+        pendingViewModel?.isBatteryOptimized = !isIgnoring
         requestNotificationPermission()
     }
 
