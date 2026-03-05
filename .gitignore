@@ -44,3 +44,25 @@ vendor/
 
 # Uploaded/temp images (not assets)
 file_*.png
+
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/app/release/
+android/app/.cxx/
+android/app/libs/
+android/local.properties
+android/.idea/
+android/captures/
+android/*.iml
+android/app/*.iml
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# External repos (jangan ikut commit)
+Xray-core-libXray/
+libXray/
+*.dex

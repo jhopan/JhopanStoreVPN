@@ -1,0 +1,2 @@
+-keepclassmembers class * implements android.net.VpnService { *; }
+-keep class com.jhopanstore.vpn.** { *; }

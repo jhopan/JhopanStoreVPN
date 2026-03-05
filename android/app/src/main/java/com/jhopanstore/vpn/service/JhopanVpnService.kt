@@ -1,0 +1,330 @@
+package com.jhopanstore.vpn.service
+
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import android.net.VpnService
+import android.os.Build
+import android.os.ParcelFileDescriptor
+import android.system.Os
+import android.system.OsConstants
+import android.util.Log
+import com.jhopanstore.vpn.MainActivity
+import com.jhopanstore.vpn.R
+import com.jhopanstore.vpn.core.Tun2socksManager
+import com.jhopanstore.vpn.core.VlessConfig
+import com.jhopanstore.vpn.core.XrayManager
+import libXray.LibXray
+import java.io.IOException
+
+/**
+ * Android VpnService that creates a TUN interface and routes traffic
+ * through Xray (via libXray in-process) + tun2socks bridge.
+ *
+ * Traffic flow:
+ *   Apps → TUN fd → tun2socks → SOCKS5 → Xray (libXray) → internet
+ *
+ * Key improvement with libXray:
+ *   - registerDialerController(protectFd) ensures Xray's outgoing sockets
+ *     are protected from VPN routing (prevents routing loops)
+ *   - No xray binary process to manage
+ */
+class JhopanVpnService : VpnService() {
+
+    companion object {
+        private const val TAG = "JhopanVpnService"
+        private const val CHANNEL_ID = "jhopan_vpn_channel"
+        private const val NOTIFICATION_ID = 1
+        private const val ACTION_STOP = "ACTION_STOP"
+        const val EXTRA_VLESS_URI = "vless_uri"
+        const val EXTRA_DNS1 = "dns1"
+        const val EXTRA_DNS2 = "dns2"
+        const val EXTRA_AUTO_RECONNECT = "auto_reconnect"
+        private const val MAX_RECONNECT_ATTEMPTS = 5
+
+        @Volatile
+        var isRunning = false
+            private set
+
+        fun start(context: Context, vlessUri: String, dns1: String, dns2: String, autoReconnect: Boolean) {
+            val intent = Intent(context, JhopanVpnService::class.java).apply {
+                putExtra(EXTRA_VLESS_URI, vlessUri)
+                putExtra(EXTRA_DNS1, dns1)
+                putExtra(EXTRA_DNS2, dns2)
+                putExtra(EXTRA_AUTO_RECONNECT, autoReconnect)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
+        }
+
+        fun stop(context: Context) {
+            val intent = Intent(context, JhopanVpnService::class.java).apply {
+                action = ACTION_STOP
+            }
+            context.startService(intent)
+        }
+    }
+
+    private var tunFd: ParcelFileDescriptor? = null
+
+    // State for auto-reconnect
+    private var lastVlessUri: String? = null
+    private var lastDns1: String = "8.8.8.8"
+    private var lastDns2: String = "8.8.4.4"
+    private var autoReconnect = false
+    private var reconnectAttempts = 0
+
+    override fun onCreate() {
+        super.onCreate()
+        createNotificationChannel()
+
+        // Register VPN socket protection callback with libXray.
+        // When Xray creates outgoing connections, protectFd() is called
+        // so those sockets bypass the VPN TUN → prevents routing loops.
+        LibXray.registerDialerController(object : libXray.DialerController {
+            override fun protectFd(fd: Long): Boolean {
+                val protected_ = protect(fd.toInt())
+                if (!protected_) {
+                    Log.w(TAG, "Failed to protect fd=$fd")
+                }
+                return protected_
+            }
+        })
+        Log.i(TAG, "Registered DialerController for socket protection")
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_STOP) {
+            autoReconnect = false
+            disconnect()
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
+        val vlessUri = intent?.getStringExtra(EXTRA_VLESS_URI)
+        if (vlessUri.isNullOrEmpty()) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
+        val dns1 = intent.getStringExtra(EXTRA_DNS1) ?: "8.8.8.8"
+        val dns2 = intent.getStringExtra(EXTRA_DNS2) ?: "8.8.4.4"
+        autoReconnect = intent.getBooleanExtra(EXTRA_AUTO_RECONNECT, false)
+
+        startForeground(NOTIFICATION_ID, buildNotification("Connecting..."))
+
+        Thread {
+            connect(vlessUri, dns1, dns2)
+        }.start()
+
+        return START_STICKY
+    }
+
+    private fun connect(vlessUri: String, dns1: String, dns2: String) {
+        try {
+            // Save for reconnection
+            lastVlessUri = vlessUri
+            lastDns1 = dns1
+            lastDns2 = dns2
+
+            val parseResult = com.jhopanstore.vpn.core.VlessParser.parse(vlessUri)
+            val cfg = parseResult.getOrElse {
+                Log.e(TAG, "Failed to parse VLESS URI", it)
+                updateNotification("Parse error")
+                stopSelf()
+                return
+            }
+
+            // Pre-resolve proxy server domain to IP BEFORE VPN TUN is established
+            val resolvedIp = XrayManager.resolveDomain(cfg.address)
+            Log.i(TAG, "Proxy server: ${cfg.address} -> ${resolvedIp ?: "unresolved (using domain)"}")
+
+            // Set up death callback for auto-reconnect
+            XrayManager.onProcessDied = {
+                if (autoReconnect && reconnectAttempts < MAX_RECONNECT_ATTEMPTS && lastVlessUri != null) {
+                    reconnectAttempts++
+                    val delay = 3000L * reconnectAttempts
+                    Log.w(TAG, "Xray died, reconnecting in ${delay}ms (attempt $reconnectAttempts)")
+                    updateNotification("Reconnecting ($reconnectAttempts)...")
+                    Thread.sleep(delay)
+                    connect(lastVlessUri!!, lastDns1, lastDns2)
+                } else {
+                    Log.e(TAG, "Auto-reconnect exhausted or disabled")
+                    disconnect()
+                    stopSelf()
+                }
+            }
+
+            // Start Xray core via libXray (in-process)
+            val started = XrayManager.start(this, cfg, dns1, dns2, resolvedIp)
+            if (!started) {
+                Log.e(TAG, "Failed to start Xray")
+                if (autoReconnect && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                    reconnectAttempts++
+                    val delay = 3000L * reconnectAttempts
+                    Log.w(TAG, "Retrying in ${delay}ms (attempt $reconnectAttempts)")
+                    updateNotification("Retry ($reconnectAttempts)...")
+                    Thread.sleep(delay)
+                    connect(vlessUri, dns1, dns2)
+                    return
+                }
+                updateNotification("Xray start failed")
+                stopSelf()
+                return
+            }
+
+            // Wait for Xray SOCKS proxy to be ready
+            Thread.sleep(1000)
+
+            // Establish TUN interface
+            val builder = Builder()
+                .setSession("JhopanStoreVPN")
+                .addAddress("10.0.0.2", 24)
+                .addAddress("fd00::2", 128)
+                .addRoute("0.0.0.0", 0)
+                .addRoute("::", 0)
+                .addDnsServer(dns1.ifBlank { "8.8.8.8" })
+                .addDnsServer(dns2.ifBlank { "8.8.4.4" })
+                .setMtu(1400)
+
+            // Exclude our own app as defense-in-depth (protectFd handles this too)
+            builder.addDisallowedApplication(packageName)
+
+            tunFd = builder.establish()
+            if (tunFd == null) {
+                Log.e(TAG, "Failed to establish TUN interface")
+                XrayManager.stop()
+                updateNotification("TUN failed")
+                stopSelf()
+                return
+            }
+
+            val tunFdNum = tunFd!!.fd
+            Log.d(TAG, "TUN fd number: $tunFdNum")
+
+            // Clear O_CLOEXEC flag so tun2socks child process can inherit the fd
+            try {
+                val fileDescriptor = tunFd!!.fileDescriptor
+                val flags = Os.fcntlInt(fileDescriptor, OsConstants.F_GETFD, 0)
+                Os.fcntlInt(fileDescriptor, OsConstants.F_SETFD, flags and OsConstants.FD_CLOEXEC.inv())
+                Log.d(TAG, "Cleared O_CLOEXEC on TUN fd")
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to clear O_CLOEXEC: ${e.message}")
+            }
+
+            // Start tun2socks to bridge TUN ↔ Xray SOCKS5 proxy
+            val tun2socksStarted = Tun2socksManager.start(this, tunFdNum)
+            if (!tun2socksStarted) {
+                Log.e(TAG, "Failed to start tun2socks")
+                XrayManager.stop()
+                tunFd?.close()
+                tunFd = null
+                updateNotification("tun2socks failed")
+                stopSelf()
+                return
+            }
+
+            isRunning = true
+            reconnectAttempts = 0
+            Log.i(TAG, "VPN connected successfully (libXray + tun2socks)")
+            updateNotification("Connected — ${cfg.address}:${cfg.port}")
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Connection error", e)
+            disconnect()
+            stopSelf()
+        }
+    }
+
+    private fun disconnect() {
+        isRunning = false
+        XrayManager.onProcessDied = null
+
+        // Stop in reverse order: tun2socks first, then TUN, then Xray
+        Tun2socksManager.stop()
+        XrayManager.stop()
+
+        try {
+            tunFd?.close()
+        } catch (e: IOException) {
+            Log.e(TAG, "Error closing TUN", e)
+        }
+        tunFd = null
+
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        Log.i(TAG, "VPN disconnected")
+    }
+
+    override fun onDestroy() {
+        disconnect()
+        super.onDestroy()
+    }
+
+    override fun onRevoke() {
+        autoReconnect = false
+        disconnect()
+        stopSelf()
+        super.onRevoke()
+    }
+
+    // --- Notification helpers ---
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "JhopanStoreVPN",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "VPN connection status"
+            }
+            val nm = getSystemService(NotificationManager::class.java)
+            nm.createNotificationChannel(channel)
+        }
+    }
+
+    private fun buildNotification(text: String): Notification {
+        val pendingIntent = PendingIntent.getActivity(
+            this, 0,
+            Intent(this, MainActivity::class.java),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        val stopIntent = PendingIntent.getService(
+            this, 1,
+            Intent(this, JhopanVpnService::class.java).apply { action = ACTION_STOP },
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Notification.Builder(this, CHANNEL_ID)
+        } else {
+            @Suppress("DEPRECATION")
+            Notification.Builder(this)
+        }
+
+        return builder
+            .setContentTitle("JhopanStoreVPN")
+            .setContentText(text)
+            .setSmallIcon(R.drawable.ic_vpn_key)
+            .setContentIntent(pendingIntent)
+            .addAction(
+                Notification.Action.Builder(
+                    null, "Disconnect", stopIntent
+                ).build()
+            )
+            .setOngoing(true)
+            .build()
+    }
+
+    private fun updateNotification(text: String) {
+        val nm = getSystemService(NotificationManager::class.java)
+        nm.notify(NOTIFICATION_ID, buildNotification(text))
+    }
+}
