@@ -88,13 +88,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // State
-    var isConnected by mutableStateOf(false)
-    var isConnecting by mutableStateOf(false)
-    var statusText by mutableStateOf("Disconnected")
-    var pingResult by mutableStateOf("-")
-    var showSettings by mutableStateOf(false)
-
     // Hotspot sharing state
     var showHotspot by mutableStateOf(false)
     var isHotspotDetected by mutableStateOf(false)
