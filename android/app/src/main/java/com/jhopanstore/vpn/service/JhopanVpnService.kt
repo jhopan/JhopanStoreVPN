@@ -171,7 +171,7 @@ class JhopanVpnService : VpnService() {
             val resolvedIp = XrayManager.resolveDomain(cfg.address)
             Log.i(TAG, "Proxy server: ${cfg.address} -> ${resolvedIp ?: "unresolved (using domain)"}")
 
-            // Set up death callback for auto-reconnect (loop-based, no recursion)
+            // Set up death callback for auto-reconnect (iteratif, bukan rekursif)
             XrayManager.onProcessDied = {
                 if (autoReconnect && lastVlessUri != null) {
                     Thread {
@@ -188,15 +188,43 @@ class JhopanVpnService : VpnService() {
                                 Log.w(TAG, "Xray died, reconnecting in ${delay}ms (attempt $reconnectAttempts)")
                                 updateNotification("Reconnecting ($reconnectAttempts)...")
                                 Thread.sleep(delay)
-                                // disconnect old state before reconnect
+
+                                // Bersihkan state lama
                                 Tun2socksManager.stop()
                                 try { tunFd?.close() } catch (_: Exception) {}
                                 tunFd = null
-                                connect(lastVlessUri!!, lastDns1, lastDns2)
-                                success = XrayManager.isRunning()
+
+                                // Restart Xray
+                                val uri = lastVlessUri ?: break
+                                val parsedCfg = com.jhopanstore.vpn.core.VlessParser.parse(uri).getOrNull() ?: break
+                                val resolvedIp = XrayManager.resolveDomain(parsedCfg.address)
+                                val xrayStarted = XrayManager.start(this, parsedCfg, lastDns1, lastDns2, resolvedIp)
+                                if (!xrayStarted) continue
+
+                                Thread.sleep(1000)
+
+                                // Re-establish TUN
+                                val builder = Builder()
+                                    .setSession("JhopanStoreVPN")
+                                    .addAddress("10.0.0.2", 24)
+                                    .addRoute("0.0.0.0", 0)
+                                    .addDnsServer(lastDns1.ifBlank { "8.8.8.8" })
+                                    .addDnsServer(lastDns2.ifBlank { "8.8.4.4" })
+                                    .setMtu(1500)
+                                builder.addDisallowedApplication(packageName)
+                                tunFd = builder.establish()
+                                if (tunFd == null) { XrayManager.stop(); continue }
+
+                                val tun2socksOk = Tun2socksManager.start(this, tunFd!!.fd)
+                                if (!tun2socksOk) { XrayManager.stop(); tunFd?.close(); tunFd = null; continue }
+
+                                success = true
                             }
                             if (success) {
-                                reconnectAttempts = 0 // reset counter setelah berhasil
+                                reconnectAttempts = 0
+                                isRunning = true
+                                _state.value = VpnState.CONNECTED
+                                updateNotification("Connected")
                             } else {
                                 Log.e(TAG, "Auto-reconnect exhausted")
                                 disconnect()

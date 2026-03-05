@@ -153,7 +153,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         val uri = buildVlessUri()
         JhopanVpnService.start(context, uri, dns1, dns2, autoReconnect)
-        // Tidak perlu polling — StateFlow di init{} yang update UI
+
+        // Safety timeout: jika service hang total (tidak emit state apapun),
+        // paksa reset setelah 30 detik agar field tidak terkunci selamanya
+        viewModelScope.launch {
+            delay(30_000)
+            if (isConnecting && !isConnected) {
+                isConnecting = false
+                statusText = "Connection timeout"
+            }
+        }
     }
 
     fun disconnect(context: Context) {
