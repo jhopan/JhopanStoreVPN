@@ -282,7 +282,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: android/app/libs/libXray.aar
-          key: libxray-android-v26.1.23
+          key: libxray-android-main-${{ runner.os }}
 
       - name: Build libXray.aar from source (gomobile)
         if: steps.cache-libxray.outputs.cache-hit != 'true'
@@ -290,21 +290,39 @@ jobs:
           ANDROID_NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/27.0.12077973
         run: |
           mkdir -p android/app/libs
-          export PATH=$PATH:$(go env GOPATH)/bin
+          export GOPATH=$(go env GOPATH)
+          export PATH=$PATH:$GOPATH/bin
 
           # Install gomobile
           go install golang.org/x/mobile/cmd/gomobile@latest
 
-          # Clone XTLS/libXray at the version matching Xray-core v26.1.23
-          git clone --depth 1 --branch v26.1.23 \
-            https://github.com/XTLS/libXray /tmp/libxray-src
+          # Clone libXray source (Go wrapper files)
+          git clone --depth 1 https://github.com/XTLS/libXray /tmp/libxray-src
+
+          # Clone Xray-core MAIN — its go.mod pins gvisor v0.0.0-20260122175437
+          # which fixes the Go 1.26 build-tag conflict present in v26.1.23
+          git clone --depth 1 https://github.com/XTLS/Xray-core /tmp/Xray-core-libXray
+
           cd /tmp/libxray-src
 
-          # Build using the official XTLS build script
-          # (clones Xray-core, sets up go.mod, runs gomobile bind)
-          python3 build/main.py android || true
+          # Recreate go.mod pointing to local Xray-core clone
+          # (mirrors what the XTLS build script's init_go_env() does,
+          #  but skips download_geo which is only needed at runtime)
+          rm -f go.mod go.sum
+          go mod init github.com/xtls/libxray
+          go mod edit -replace github.com/xtls/xray-core=../Xray-core-libXray
+          go mod tidy
 
-          # Verify AAR was produced (build script cleanup step can fail safely)
+          # Init gomobile cross-compilation toolchain
+          gomobile init
+
+          # Build the AAR
+          gomobile bind \
+            -target android \
+            -androidapi 21 \
+            -o libXray.aar \
+            .
+
           if [ ! -f libXray.aar ]; then
             echo "✗ Build failed — libXray.aar not found"
             ls -la
