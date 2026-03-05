@@ -24,7 +24,7 @@ on:
         default: true
 
 jobs:
-  # Deteksi file apa yang berubah sejak commit sebelumnya
+  # Deteksi file apa yang berubah sejak commit/tag sebelumnya
   changes:
     runs-on: ubuntu-latest
     outputs:
@@ -33,10 +33,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
+
+      - name: Tentukan base ref untuk perbandingan
+        id: base
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            # Tag push: bandingkan terhadap tag sebelumnya
+            PREV_TAG=$(git tag --sort=-version:refname | grep -v "^${{ github.ref_name }}$" | head -1)
+            if [ -z "$PREV_TAG" ]; then
+              echo "base=HEAD~1" >> $GITHUB_OUTPUT
+            else
+              echo "base=$PREV_TAG" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "base=HEAD~1" >> $GITHUB_OUTPUT
+          fi
+
       - uses: dorny/paths-filter@v3
         id: filter
         with:
+          base: ${{ steps.base.outputs.base }}
           filters: |
             desktop:
               - '**/*.go'
