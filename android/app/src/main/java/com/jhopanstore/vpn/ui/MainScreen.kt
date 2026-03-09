@@ -283,7 +283,7 @@ private fun MainContent(
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        text = "Proxy: ${viewModel.hotspotIp}:10808",
+                        text = "Proxy: ${viewModel.hotspotIp}:10809",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Medium,
                         modifier = Modifier.weight(1f)

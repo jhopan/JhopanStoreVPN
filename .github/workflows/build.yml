@@ -89,6 +89,14 @@ jobs:
           $xrayExe = Get-ChildItem -Recurse xray-tmp -Filter "xray.exe" | Select-Object -First 1
           Copy-Item $xrayExe.FullName ./xray.exe
 
+      - name: Download tun2socks binary
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/xjasonlyu/tun2socks/releases/download/v2.5.2/tun2socks-windows-amd64.zip" -OutFile tun2socks.zip
+          Expand-Archive tun2socks.zip -DestinationPath tun2socks-tmp -Force
+          New-Item -ItemType Directory -Force -Path bin
+          Copy-Item tun2socks-tmp/tun2socks-windows-amd64.exe bin/tun2socks.exe
+
       - name: Build
         shell: pwsh
         run: |
@@ -101,10 +109,46 @@ jobs:
           New-Item -ItemType Directory -Force -Path release/JhopanStoreVPN-windows
           Copy-Item JhopanStoreVPN.exe release/JhopanStoreVPN-windows/
           Copy-Item xray.exe release/JhopanStoreVPN-windows/
+          Copy-Item -Recurse bin release/JhopanStoreVPN-windows/
           New-Item -ItemType Directory -Force -Path release/JhopanStoreVPN-windows/assets
           Copy-Item assets/background.png release/JhopanStoreVPN-windows/assets/
           Copy-Item assets/icon64.png release/JhopanStoreVPN-windows/assets/
           Copy-Item assets/icon256.png release/JhopanStoreVPN-windows/assets/
+          
+          # Create README
+          @"
+JhopanStoreVPN v2.0.0 - TUN Mode (Windows)
+==========================================
+
+REQUIREMENTS:
+- Windows 10/11 (64-bit)
+- Administrator privileges (REQUIRED for TUN mode)
+
+INSTALLATION:
+Extract all files and keep folder structure intact:
+  JhopanStoreVPN.exe
+  xray.exe
+  bin/
+    tun2socks.exe
+  assets/
+    (icon files)
+
+USAGE:
+1. Right-click JhopanStoreVPN.exe
+2. Select "Run as Administrator"
+3. Enter VLESS server details or paste vless:// link
+4. Click CONNECT
+
+FEATURES:
+- TUN mode - System-wide VPN (ALL apps work)
+- No manual proxy configuration needed
+- Works with: WhatsApp, Telegram, Discord, games, etc.
+- Auto-reconnect on disconnect
+- Real-time latency monitoring
+
+NOTE: Windows may ask to install Wintun driver on first run - click Yes.
+"@ | Out-File -FilePath release/JhopanStoreVPN-windows/README.txt -Encoding UTF8
+          
           Compress-Archive -Path release/JhopanStoreVPN-windows -DestinationPath release/JhopanStoreVPN-windows.zip
 
       - name: Upload Artifact

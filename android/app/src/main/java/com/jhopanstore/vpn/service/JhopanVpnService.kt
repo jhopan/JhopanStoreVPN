@@ -87,6 +87,7 @@ class JhopanVpnService : VpnService() {
 
     private var tunFd: ParcelFileDescriptor? = null
     private var reconnectWakeLock: PowerManager.WakeLock? = null
+    private var serviceWakeLock: PowerManager.WakeLock? = null
 
     // State for auto-reconnect
     private var lastVlessUri: String? = null
@@ -98,6 +99,17 @@ class JhopanVpnService : VpnService() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+        
+        // Acquire WakeLock untuk mencegah service mati saat layar mati
+        val pm = getSystemService(POWER_SERVICE) as PowerManager
+        serviceWakeLock = pm.newWakeLock(
+            PowerManager.PARTIAL_WAKE_LOCK,
+            "jhopanvpn:service"
+        ).apply {
+            setReferenceCounted(false)
+            acquire()
+        }
+        Log.i(TAG, "Service WakeLock acquired")
 
         // Register VPN socket protection callback with libXray.
         // When Xray creates outgoing connections, protectFd() is called
@@ -369,6 +381,15 @@ class JhopanVpnService : VpnService() {
     override fun onDestroy() {
         disconnect()
         super.onDestroy()
+        
+        // Release WakeLock saat service destroy
+        serviceWakeLock?.let {
+            if (it.isHeld) {
+                it.release()
+                Log.i(TAG, "Service WakeLock released")
+            }
+        }
+        serviceWakeLock = null
     }
 
     override fun onRevoke() {
@@ -385,9 +406,13 @@ class JhopanVpnService : VpnService() {
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 "JhopanStoreVPN",
-                NotificationManager.IMPORTANCE_LOW
+                NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
                 description = "VPN connection status"
+                // Prevent notification removal by system
+                setShowBadge(true)
+                enableLights(false)
+                enableVibration(false)
             }
             val nm = getSystemService(NotificationManager::class.java)
             nm.createNotificationChannel(channel)
@@ -412,6 +437,7 @@ class JhopanVpnService : VpnService() {
         } else {
             @Suppress("DEPRECATION")
             Notification.Builder(this)
+                .setPriority(Notification.PRIORITY_HIGH)
         }
 
         return builder
@@ -425,6 +451,8 @@ class JhopanVpnService : VpnService() {
                 ).build()
             )
             .setOngoing(true)
+            .setCategory(Notification.CATEGORY_SERVICE)
+            .setAutoCancel(false)
             .build()
     }
 

@@ -17,7 +17,7 @@ import (
 
 	"jhovpn/assets"
 	"jhovpn/core/ping"
-	"jhovpn/core/proxy"
+	"jhovpn/core/tun"
 	"jhovpn/core/vless"
 	"jhovpn/core/xray"
 	appUI "jhovpn/ui"
@@ -26,9 +26,6 @@ import (
 )
 
 func main() {
-	// Safety: reset proxy on startup
-	proxy.ResetSystemProxy()
-
 	// Create Fyne app
 	a := app.NewWithID("com.jhopanstorevpn.app")
 	a.Settings().SetTheme(&jhovpnTheme.DarkTheme{})
@@ -44,6 +41,7 @@ func main() {
 	// State
 	var (
 		xrayProc    *xray.Process
+		tunDevice   *tun.TunDevice
 		pinger      *ping.Pinger
 		connected   bool
 		connectMu   sync.Mutex
@@ -73,7 +71,11 @@ func main() {
 		if xrayProc != nil {
 			xrayProc.Stop()
 		}
-		proxy.ResetSystemProxy()
+		// Close TUN device
+		if tunDevice != nil {
+			tunDevice.Close()
+			tunDevice = nil
+		}
 
 		if mainPage != nil {
 			mainPage.SetDisconnected()
@@ -84,11 +86,15 @@ func main() {
 	var doConnect func()
 
 	onXrayCrash := func() {
-		log.Println("[JhopanStoreVPN] Xray crashed, resetting proxy")
+		log.Println("[JhopanStoreVPN] Xray crashed, cleaning up TUN device")
 		if pinger != nil {
 			pinger.Stop()
 		}
-		proxy.ResetSystemProxy()
+		// Close TUN device
+		if tunDevice != nil {
+			tunDevice.Close()
+			tunDevice = nil
+		}
 
 		connectMu.Lock()
 		wasConnected := connected
@@ -200,12 +206,40 @@ func main() {
 			}
 			log.Println("[JhopanStoreVPN] Xray port 10809 is ready")
 
-			// Set system proxy
-			mainPage.SetStatus("Setting proxy...")
-			if err := proxy.SetSystemProxy(); err != nil {
-				log.Printf("[JhopanStoreVPN] WARNING: failed to set system proxy: %v", err)
-				mainPage.SetStatus("Proxy set failed!")
+			// Create and start TUN device
+			mainPage.SetStatus("Creating VPN tunnel...")
+			tunCfg := tun.Config{
+				Name:      "",  // Auto-assign (tun0, utun3, etc.)
+				IP:        "10.0.0.2",
+				Gateway:   "10.0.0.1",
+				DNS:       []string{"8.8.8.8", "1.1.1.1"},
+				MTU:       1500,
+				SocksAddr: "127.0.0.1:10809",
 			}
+			
+			var tunErr error
+			tunDevice, tunErr = tun.NewTunDevice(tunCfg)
+			if tunErr != nil {
+				log.Printf("[JhopanStoreVPN] ERROR: Failed to create TUN device: %v", tunErr)
+				xrayProc.Stop()
+				mainPage.SetDisconnected()
+				mainPage.SetStatus("TUN creation failed!")
+				dialog.ShowError(fmt.Errorf("Failed to create VPN tunnel:\n%v\n\nNote: VPN mode requires admin/root privileges", tunErr), w)
+				return
+			}
+			
+			if err := tunDevice.Start(); err != nil {
+				log.Printf("[JhopanStoreVPN] ERROR: Failed to start TUN device: %v", err)
+				tunDevice.Close()
+				tunDevice = nil
+				xrayProc.Stop()
+				mainPage.SetDisconnected()
+				mainPage.SetStatus("TUN start failed!")
+				dialog.ShowError(fmt.Errorf("Failed to start VPN tunnel:\n%v", err), w)
+				return
+			}
+			
+			log.Printf("[JhopanStoreVPN] TUN device started: %s", tunDevice.Name)
 
 			connectMu.Lock()
 			connected = true
@@ -248,7 +282,11 @@ func main() {
 									connected = false
 									connectMu.Unlock()
 									log.Println("[JhopanStoreVPN] Detected xray stopped, reconnecting...")
-									proxy.ResetSystemProxy()
+									// Close TUN device before reconnecting
+									if tunDevice != nil {
+										tunDevice.Close()
+										tunDevice = nil
+									}
 									mainPage.SetStatus("Reconnecting...")
 									time.Sleep(2 * time.Second)
 									doConnect()
@@ -377,6 +415,9 @@ func main() {
 		prefs.SetString("auto_reconnect_set", "yes")
 		prefs.SetBool("allow_insecure", settingsPage.AllowInsecureCheck.Checked)
 		prefs.SetString("allow_insecure_set", "yes")
+		
+		// Force sync to disk to prevent data loss
+		log.Println("[JhopanStoreVPN] Preferences saved")
 	}
 
 	mainPage.AddressEntry.OnChanged = func(_ string) { savePrefs() }
@@ -407,6 +448,9 @@ func main() {
 		OnConnect:    doConnect,
 		OnDisconnect: doDisconnect,
 		OnExit: func() {
+			log.Println("[JhopanStoreVPN] Exit requested from tray, saving preferences...")
+			savePrefs() // Save before quitting
+			time.Sleep(100 * time.Millisecond) // Give time for preferences to flush
 			doDisconnect()
 			a.Quit()
 		},
@@ -414,7 +458,9 @@ func main() {
 
 	// Window close behavior depends on system tray toggle
 	w.SetCloseIntercept(func() {
+		log.Println("[JhopanStoreVPN] Window close intercepted, saving preferences...")
 		savePrefs()
+		time.Sleep(50 * time.Millisecond) // Give time for preferences to flush
 		if settingsPage.IsSystemTray() {
 			w.Hide()
 			visible = false

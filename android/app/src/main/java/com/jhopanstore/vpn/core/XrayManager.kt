@@ -26,6 +26,7 @@ import java.net.InetAddress
 object XrayManager {
     private const val TAG = "XrayManager"
     const val SOCKS_PORT = 10808
+    const val HTTP_PORT = 10809  // HTTP proxy for WiFi manual proxy (Android compatibility)
 
     /** Called when Xray state changes to stopped unexpectedly. */
     var onProcessDied: (() -> Unit)? = null
@@ -95,6 +96,7 @@ object XrayManager {
 
         // -- inbounds --
         root.put("inbounds", JSONArray().apply {
+            // SOCKS5 inbound (for tun2socks and advanced usage)
             put(JSONObject().apply {
                 put("tag", "socks-in")
                 put("port", SOCKS_PORT)
@@ -102,6 +104,16 @@ object XrayManager {
                 put("protocol", "socks")
                 put("settings", JSONObject().apply { put("udp", true) })
             })
+            // HTTP inbound (for WiFi manual proxy when hotspot sharing)
+            // Android WiFi manual proxy only supports HTTP, not SOCKS5!
+            if (hotspotSharing) {
+                put(JSONObject().apply {
+                    put("tag", "http-in")
+                    put("port", HTTP_PORT)
+                    put("listen", "0.0.0.0")
+                    put("protocol", "http")
+                })
+            }
         })
 
         // -- outbounds --
@@ -166,16 +178,21 @@ object XrayManager {
                         put("outboundTag", "dns-out")
                     })
                 } else {
-                    put(JSONObject().apply {
-                        put("type", "field")
-                        put("ip", JSONArray().apply {
-                            put("10.0.0.0/8")
-                            put("172.16.0.0/12")
-                            put("192.168.0.0/16")
-                            put("127.0.0.0/8")
+                    // Hanya bypass local traffic jika TIDAK sedang berbagi hotspot
+                    // Ketika hotspot sharing aktif, semua traffic (termasuk dari device lain)
+                    // harus di-route melalui VPN proxy, bukan direct
+                    if (!hotspotSharing) {
+                        put(JSONObject().apply {
+                            put("type", "field")
+                            put("ip", JSONArray().apply {
+                                put("10.0.0.0/8")
+                                put("172.16.0.0/12")
+                                put("192.168.0.0/16")
+                                put("127.0.0.0/8")
+                            })
+                            put("outboundTag", "direct")
                         })
-                        put("outboundTag", "direct")
-                    })
+                    }
                 }
             })
         })

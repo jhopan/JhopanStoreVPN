@@ -62,7 +62,10 @@ class MainActivity : ComponentActivity() {
                     val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
                     val alreadyAsked = prefs.getBoolean("battery_opt_asked", false)
                     val pm = getSystemService(POWER_SERVICE) as PowerManager
-                    if (!alreadyAsked && !pm.isIgnoringBatteryOptimizations(packageName)) {
+                    val isIgnoring = pm.isIgnoringBatteryOptimizations(packageName)
+                    // Hanya tampilkan dialog jika belum pernah ditanya DAN belum di-disable battery opt
+                    // Sekali user pilih "Nanti" atau "Nonaktifkan", dialog tidak akan muncul lagi
+                    if (!alreadyAsked && !isIgnoring) {
                         showBatteryOptDialog = true
                     }
                 }
@@ -70,7 +73,10 @@ class MainActivity : ComponentActivity() {
                 if (showBatteryOptDialog) {
                     AlertDialog(
                         onDismissRequest = {
-                            getSharedPreferences("app_prefs", MODE_PRIVATE).edit().putBoolean("battery_opt_asked", true).apply()
+                            // Gunakan commit() agar langsung tersimpan (synchronous)
+                            getSharedPreferences("app_prefs", MODE_PRIVATE).edit()
+                                .putBoolean("battery_opt_asked", true)
+                                .commit()
                             showBatteryOptDialog = false
                             requestNotificationPermission()
                         },
@@ -78,18 +84,25 @@ class MainActivity : ComponentActivity() {
                         text = { Text("Nonaktifkan pembatasan daya agar VPN tetap aktif saat layar mati dan tidak terputus tiba-tiba.") },
                         confirmButton = {
                             TextButton(onClick = {
-                                getSharedPreferences("app_prefs", MODE_PRIVATE).edit().putBoolean("battery_opt_asked", true).apply()
+                                // Gunakan commit() agar langsung tersimpan
+                                getSharedPreferences("app_prefs", MODE_PRIVATE).edit()
+                                    .putBoolean("battery_opt_asked", true)
+                                    .commit()
                                 showBatteryOptDialog = false
                                 startActivity(
                                     Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
                                         data = Uri.parse("package:$packageName")
                                     }
                                 )
+                                requestNotificationPermission()
                             }) { Text("Nonaktifkan") }
                         },
                         dismissButton = {
                             TextButton(onClick = {
-                                getSharedPreferences("app_prefs", MODE_PRIVATE).edit().putBoolean("battery_opt_asked", true).apply()
+                                // Gunakan commit() agar langsung tersimpan
+                                getSharedPreferences("app_prefs", MODE_PRIVATE).edit()
+                                    .putBoolean("battery_opt_asked", true)
+                                    .commit()
                                 showBatteryOptDialog = false
                                 requestNotificationPermission()
                             }) { Text("Nanti") }
@@ -131,7 +144,21 @@ class MainActivity : ComponentActivity() {
 
     override fun onPause() {
         super.onPause()
-        pendingViewModel?.saveSettings(this)
+        // Background save dengan apply() saat pause
+        pendingViewModel?.saveSettings(this, immediate = false)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Immediate save dengan commit() saat stop untuk mencegah data loss
+        // jika app di-kill dari recent apps atau system
+        pendingViewModel?.saveSettings(this, immediate = true)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // Final save dengan commit() saat destroy - last resort
+        pendingViewModel?.saveSettings(this, immediate = true)
     }
 
     private fun requestNotificationPermission() {
@@ -183,7 +210,8 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun copyProxyToClipboard(vm: MainViewModel) {
-        val text = "${vm.hotspotIp}:10808"
+        // Use HTTP port (10809) for WiFi manual proxy, not SOCKS5 (10808)
+        val text = "${vm.hotspotIp}:10809"
         val clipboard = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
         clipboard.setPrimaryClip(ClipData.newPlainText("Proxy", text))
         Toast.makeText(this, "Disalin: $text", Toast.LENGTH_SHORT).show()

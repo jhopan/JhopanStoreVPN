@@ -2,6 +2,7 @@ package com.jhopanstore.vpn.ui
 
 import android.app.Application
 import android.content.Context
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -46,6 +47,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     var statusText by mutableStateOf("Disconnected")
     var pingResult by mutableStateOf("-")
     var showSettings by mutableStateOf(false)
+    
+    // Flag untuk menandai sedang restart VPN (jangan reset proxy state)
+    private var isRestarting = false
 
     init {
         // Collect StateFlow dari service — langsung update UI tanpa polling
@@ -56,6 +60,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         isConnected = true
                         isConnecting = false
                         statusText = "Connected"
+                        isRestarting = false  // Reset flag setelah berhasil connect
                         startPingLoop()
                     }
                     JhopanVpnService.VpnState.CONNECTING -> {
@@ -68,8 +73,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         isConnecting = false
                         statusText = "Connection failed"
                         pingResult = "-"
-                        isProxySharingActive = false
-                        XrayManager.hotspotSharing = false
+                        isRestarting = false  // Reset flag
+                        // Hanya reset proxy state jika BUKAN sedang restart
+                        if (!isRestarting) {
+                            isProxySharingActive = false
+                            XrayManager.hotspotSharing = false
+                        }
                     }
                     JhopanVpnService.VpnState.DISCONNECTED -> {
                         // Hanya update jika memang sedang connected/connecting
@@ -79,8 +88,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             isConnecting = false
                             statusText = "Disconnected"
                             pingResult = "-"
-                            isProxySharingActive = false
-                            XrayManager.hotspotSharing = false
+                            // Jangan reset proxy state jika sedang restart VPN
+                            if (!isRestarting) {
+                                isProxySharingActive = false
+                                XrayManager.hotspotSharing = false
+                            }
                         }
                     }
                 }
@@ -193,16 +205,43 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             for (iface in interfaces) {
                 if (!iface.isUp || iface.isLoopback) continue
                 val name = iface.name.lowercase()
+                
+                // Skip interface yang PASTI BUKAN hotspot:
+                // - tun: VPN tunnel interface
+                // - rmnet/r_rmnet/ccmni: Data seluler interface (Qualcomm/Mediatek)
+                // - ppp: Point-to-point protocol
+                // - dummy: Virtual dummy interface
+                // - v4-/clat: IPv4/IPv6 translation layer
                 if (name.startsWith("tun") || name.startsWith("rmnet") ||
                     name.startsWith("ppp") || name.startsWith("dummy") ||
-                    name.startsWith("v4-") || name.startsWith("clat")) continue
+                    name.startsWith("v4-") || name.startsWith("clat") ||
+                    name.startsWith("ccmni") || name.startsWith("r_rmnet")) continue
+                
                 for (addr in iface.inetAddresses.toList()) {
                     if (addr !is Inet4Address || addr.isLoopbackAddress) continue
-                    return addr.hostAddress
+                    val ip = addr.hostAddress ?: continue
+                    
+                    // Terima semua IP private range yang umum dipakai hotspot:
+                    // 192.168.x.x (paling umum untuk hotspot)
+                    // 10.x.x.x (beberapa device pakai range ini)
+                    // 172.16.x.x - 172.31.x.x (jarang tapi mungkin)
+                    val isPrivateRange = ip.startsWith("192.168.") || 
+                                        ip.startsWith("10.") ||
+                                        ip.matches(Regex("^172\\.(1[6-9]|2[0-9]|3[0-1])\\..*"))
+                    
+                    if (isPrivateRange) {
+                        // Return IP ASLI device, JANGAN ubah jadi .1!
+                        // Device hotspot Android ITU SENDIRI yang jadi gateway & proxy server
+                        // Device lain harus connect ke IP ini, bukan gateway .1
+                        return ip
+                    }
                 }
             }
             null
-        } catch (e: Exception) { null }
+        } catch (e: Exception) { 
+            Log.e("MainViewModel", "Error detecting hotspot IP", e)
+            null 
+        }
     }
 
     /** Toggle proxy sharing on/off. Restart VPN dengan binding baru. */
@@ -210,10 +249,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (!isConnected) return
         isProxySharingActive = !isProxySharingActive
         XrayManager.hotspotSharing = isProxySharingActive
+        Log.d("MainViewModel", "Toggle proxy sharing: $isProxySharingActive")
         restartVpn(context)
     }
 
     private fun restartVpn(context: Context) {
+        isRestarting = true  // Set flag sebelum restart
+        Log.d("MainViewModel", "Restarting VPN (isRestarting=$isRestarting, proxyActive=$isProxySharingActive)")
         JhopanVpnService.stop(context)
         isConnecting = true
         statusText = "Reconnecting..."
@@ -228,6 +270,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     isConnected = true
                     isConnecting = false
                     statusText = "Connected"
+                    isRestarting = false  // Reset flag setelah berhasil
+                    Log.d("MainViewModel", "VPN restarted successfully (proxyActive=$isProxySharingActive)")
                     return@launch
                 }
                 attempts++
@@ -235,13 +279,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             isConnecting = false
             isConnected = JhopanVpnService.isRunning
             statusText = if (isConnected) "Connected" else "Reconnect failed"
+            isRestarting = false  // Reset flag meski gagal
         }
     }
 
     // --- Persistence ---
 
-    fun saveSettings(context: Context) {
-        context.getSharedPreferences("vpn_settings", Context.MODE_PRIVATE).edit()
+    fun saveSettings(context: Context, immediate: Boolean = false) {
+        val editor = context.getSharedPreferences("vpn_settings", Context.MODE_PRIVATE).edit()
             .putString("address", address)
             .putString("uuid", uuid)
             .putString("path", path)
@@ -252,7 +297,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             .putString("pingUrl", pingUrl)
             .putBoolean("allowInsecure", allowInsecure)
             .putBoolean("autoReconnect", autoReconnect)
-            .apply()
+        
+        // Use commit() untuk immediate save (synchronous) agar tidak hilang saat app di-kill
+        // Use apply() untuk background save (asynchronous) saat tidak urgent
+        if (immediate) {
+            editor.commit()
+            Log.d("MainViewModel", "Settings saved immediately (commit)")
+        } else {
+            editor.apply()
+            Log.d("MainViewModel", "Settings saved in background (apply)")
+        }
     }
 
     fun loadSettings(context: Context) {
