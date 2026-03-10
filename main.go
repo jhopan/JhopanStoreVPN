@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"sync"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 
 	"jhovpn/assets"
 	"jhovpn/core/ping"
+	"jhovpn/core/singleinstance"
 	"jhovpn/core/tun"
 	"jhovpn/core/vless"
 	"jhovpn/core/xray"
@@ -26,6 +28,17 @@ import (
 )
 
 func main() {
+	// Single instance check - prevent multiple instances
+	instance, err := singleinstance.New("JhopanStoreVPN")
+	if err != nil {
+		// Another instance is already running
+		log.Printf("Another instance is already running. Exiting.")
+		// Note: Cannot show dialog here as Fyne app is not initialized yet
+		// User will see nothing (which is expected - instance already running in tray)
+		os.Exit(0)
+	}
+	defer instance.Release()
+
 	// Create Fyne app
 	a := app.NewWithID("com.jhopanstorevpn.app")
 	a.Settings().SetTheme(&jhovpnTheme.DarkTheme{})

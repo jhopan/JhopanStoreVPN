@@ -17,6 +17,7 @@
 ## Features
 
 ### Desktop (Windows / Linux / macOS)
+
 - ✅ **TUN Mode** - System-wide VPN routing (all applications work: WhatsApp, Telegram, Discord, games, etc.)
 - ✅ VLESS over WebSocket + TLS via Xray-core
 - ✅ Clean GUI with system tray support
@@ -27,6 +28,7 @@
 - ✅ No console window — pure native GUI
 
 ### Android (APK)
+
 - ✅ **VpnService API** - True system-wide VPN (no root required)
 - ✅ VLESS protocol via libXray
 - ✅ **Hotspot Sharing** - Share VPN with WiFi hotspot (HTTP proxy on port 10809)
@@ -42,18 +44,18 @@ Go to [**Releases**](https://github.com/jhopan/JhopanStoreVPN/releases) to downl
 
 ### Desktop
 
-| Platform | File | How to Run |
-|----------|------|------------|
-| **Windows** | `JhopanStoreVPN-windows.zip` | Extract → **Run as Administrator** → `JhopanStoreVPN.exe` |
-| **Linux** | `JhopanStoreVPN-linux.tar.gz` | Extract → `sudo ./JhopanStoreVPN` or `sudo ./launch.sh` |
-| **macOS** | `JhopanStoreVPN-macos.tar.gz` | Extract → Run `JhopanStoreVPN.app` |
+| Platform    | File                          | How to Run                                                |
+| ----------- | ----------------------------- | --------------------------------------------------------- |
+| **Windows** | `JhopanStoreVPN-windows.zip`  | Extract → **Run as Administrator** → `JhopanStoreVPN.exe` |
+| **Linux**   | `JhopanStoreVPN-linux.tar.gz` | Extract → `sudo ./JhopanStoreVPN` or `sudo ./launch.sh`   |
+| **macOS**   | `JhopanStoreVPN-macos.tar.gz` | Extract → Run `JhopanStoreVPN.app`                        |
 
 > **Note**: Desktop TUN mode requires **administrator/root privileges** to create virtual network interfaces and configure routing tables.
 
 ### Android
 
-| File | Minimum Version | Install |
-|------|-----------------|---------|
+| File                 | Minimum Version      | Install                                       |
+| -------------------- | -------------------- | --------------------------------------------- |
 | `JhopanStoreVPN.apk` | Android 7.0 (API 24) | Download → Enable "Unknown Sources" → Install |
 
 ## Quick Start
@@ -76,6 +78,7 @@ Go to [**Releases**](https://github.com/jhopan/JhopanStoreVPN/releases) to downl
 ## Build from Source
 
 ### Desktop Requirements
+
 - Go 1.21+
 - GCC (MinGW on Windows)
 - Platform graphics libraries:
@@ -103,6 +106,7 @@ go build -ldflags="-s -w -H windowsgui" -o JhopanStoreVPN.exe .
 ```
 
 **Required files next to executable:**
+
 - `xray` or `xray.exe` - Download from [Xray-core Releases](https://github.com/XTLS/Xray-core/releases)
 - `bin/tun2socks.exe` (Windows) - Download from [tun2socks Releases](https://github.com/xjasonlyu/tun2socks/releases)
 
@@ -124,6 +128,7 @@ cd android
 ## Technical Architecture
 
 ### Desktop TUN Mode
+
 ```
 Applications → TUN Device (tun0)
             ↓
@@ -138,6 +143,7 @@ Applications → TUN Device (tun0)
 - **Requirements**: Admin/root privileges for interface creation
 
 ### Android VpnService
+
 ```
 Applications → Android VpnService API
             ↓
@@ -156,18 +162,22 @@ Applications → Android VpnService API
 ### Desktop
 
 **"Failed to start tun2socks"**
+
 - Solution: Run as Administrator/root
 - Make sure `bin/tun2socks.exe` exists next to the executable
 
 **"tun2socks.exe not found"**
+
 - Download from [tun2socks releases](https://github.com/xjasonlyu/tun2socks/releases/tag/v2.5.2)
 - Extract and place in `bin/` folder
 
 **Windows may prompt "Wintun driver installation"**
+
 - Click "Yes" or "Allow" to install the TUN driver
 - This is required for TUN mode to work
 
 **Connection successful but no internet**
+
 - Check if Xray is running: look for `xray.exe` process
 - Verify VLESS server is accessible
 - Check routing table: `route print 0.0.0.0` should show route via TUN
@@ -175,11 +185,13 @@ Applications → Android VpnService API
 ### Android
 
 **VPN disconnects randomly**
+
 - App uses foreground service to prevent system kill
 - Check battery optimization settings: disable for JhopanStoreVPN
 - Some OEMs (Xiaomi, Huawei) may require additional "autostart" permission
 
 **Hotspot not sharing VPN**
+
 - Make sure "Enable Hotspot Sharing" is checked in settings
 - Check if port 10809 is accessible from hotspot clients
 - Some devices may have restrictions on sharing VPN connections

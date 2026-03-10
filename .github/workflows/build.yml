@@ -97,6 +97,12 @@ jobs:
           New-Item -ItemType Directory -Force -Path bin
           Copy-Item tun2socks-tmp/tun2socks-windows-amd64.exe bin/tun2socks.exe
 
+      - name: Generate Windows manifest and version info
+        shell: pwsh
+        run: |
+          go install github.com/josephspurrier/goversioninfo/cmd/goversioninfo@latest
+          goversioninfo -64
+
       - name: Build
         shell: pwsh
         run: |
@@ -312,8 +318,6 @@ jobs:
 
       - name: Build libXray.aar from source (gomobile)
         if: steps.cache-libxray.outputs.cache-hit != 'true'
-        env:
-          ANDROID_NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/27.0.12077973
         run: |
           mkdir -p android/app/libs
           export GOPATH=$(go env GOPATH)
@@ -356,8 +360,6 @@ jobs:
 
       - name: Build APK
         working-directory: android
-        env:
-          ANDROID_NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/27.0.12077973
         run: |
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon --stacktrace

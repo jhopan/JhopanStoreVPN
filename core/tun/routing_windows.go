@@ -34,9 +34,19 @@ func (t *TunDevice) setupRouting() error {
 func (t *TunDevice) removeRouting() error {
 	log.Println("[TUN] Removing Windows routing...")
 
-	// Remove default route through TUN if it was added
-	// Note: In current implementation, tun2socks handles routing internally
-	// so we may not need to manually remove routes
+	// Try to remove default route through TUN gateway
+	// This ensures no zombie routes remain even if tun2socks didn't clean up properly
+	cmd := exec.Command("route", "delete", "0.0.0.0", "mask", "0.0.0.0", t.Gateway)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		// Route might not exist (which is fine - normal cleanup already happened)
+		if !strings.Contains(string(output), "not found") && !strings.Contains(string(output), "element not found") {
+			log.Printf("[TUN] Warning: failed to remove route: %v (%s)", err, output)
+		} else {
+			log.Println("[TUN] No TUN routes to remove (already cleaned)")
+		}
+	} else {
+		log.Printf("[TUN] Removed default route via %s", t.Gateway)
+	}
 
 	log.Println("[TUN] Windows routing cleanup complete")
 	return nil
