@@ -218,6 +218,19 @@ jobs:
         with:
           go-version: "1.21"
 
+      - name: Install macOS dependencies
+        run: |
+          # Ensure Xcode command line tools are available
+          xcode-select --install 2>/dev/null || echo "Xcode tools already installed"
+          
+      - name: Download tun2socks binary
+        run: |
+          curl -L -o tun2socks.zip "https://github.com/xjasonlyu/tun2socks/releases/download/v2.5.2/tun2socks-darwin-amd64.zip"
+          unzip -o tun2socks.zip -d tun2socks-tmp
+          mkdir -p bin
+          cp tun2socks-tmp/tun2socks-darwin-amd64 bin/tun2socks
+          chmod +x bin/tun2socks
+
       - name: Download Xray-core
         run: |
           curl -L -o xray.zip "https://github.com/XTLS/Xray-core/releases/latest/download/Xray-macos-arm64-v8a.zip"
@@ -227,6 +240,12 @@ jobs:
 
       - name: Build
         run: |
+          # Clean up any Windows-specific build artifacts
+          rm -f resource.syso *.syso
+          # Verify cleanup
+          echo "=== Cleaned build directory ==="
+          ls -la | grep -E '\.syso$' || echo "No .syso files found (good)"
+          # Build for macOS
           CGO_ENABLED=1 go build -v -ldflags="-s -w" -o JhopanStoreVPN .
 
       - name: Package
@@ -234,15 +253,18 @@ jobs:
           # Create macOS .app bundle
           APP="release/JhopanStoreVPN.app"
           mkdir -p "$APP/Contents/MacOS"
+          mkdir -p "$APP/Contents/MacOS/bin"
           mkdir -p "$APP/Contents/Resources/assets"
 
           cp JhopanStoreVPN "$APP/Contents/MacOS/"
           cp xray "$APP/Contents/MacOS/"
+          cp -r bin "$APP/Contents/MacOS/"
           cp assets/background.png "$APP/Contents/Resources/assets/"
           cp assets/icon64.png "$APP/Contents/Resources/assets/"
           cp assets/icon256.png "$APP/Contents/Resources/assets/"
           chmod +x "$APP/Contents/MacOS/JhopanStoreVPN"
           chmod +x "$APP/Contents/MacOS/xray"
+          chmod +x "$APP/Contents/MacOS/bin/tun2socks"
 
           # Create Info.plist
           cat > "$APP/Contents/Info.plist" << 'PLIST'
@@ -259,9 +281,9 @@ jobs:
             <key>CFBundleDisplayName</key>
             <string>JhopanStoreVPN</string>
             <key>CFBundleVersion</key>
-            <string>1.0.0</string>
+            <string>2.0.0</string>
             <key>CFBundleShortVersionString</key>
-            <string>1.0.0</string>
+            <string>2.0.0</string>
             <key>CFBundlePackageType</key>
             <string>APPL</string>
             <key>LSMinimumSystemVersion</key>
