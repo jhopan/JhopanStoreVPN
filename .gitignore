@@ -20,6 +20,7 @@ build/
 *.log
 *.json
 !go.mod
+!versioninfo.json
 test_*.json
 xray_*.log
 
