@@ -170,6 +170,13 @@ object XrayManager {
                     })
                 })
                 put("streamSettings", streamSettings)
+                // Mux: multiplex many TCP streams over ONE WebSocket/TLS connection.
+                // Each new app connection no longer needs a fresh TLS handshake → fewer
+                // RTTs, lower baterai usage, faster throughput for bursty traffic.
+                put("mux", JSONObject().apply {
+                    put("enabled", true)
+                    put("concurrency", 8)
+                })
             })
             put(JSONObject().apply {
                 put("tag", "direct")

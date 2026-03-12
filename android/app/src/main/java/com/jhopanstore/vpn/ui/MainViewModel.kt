@@ -13,10 +13,13 @@ import com.jhopanstore.vpn.core.VlessParser
 import com.jhopanstore.vpn.core.XrayManager
 import com.jhopanstore.vpn.service.JhopanVpnService
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.net.Inet4Address
 import java.net.HttpURLConnection
 import java.net.InetSocketAddress
@@ -50,6 +53,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     
     // Flag untuk menandai sedang restart VPN (jangan reset proxy state)
     private var isRestarting = false
+
+    // Job reference so ping burst is cancellable on disconnect
+    private var pingJob: Job? = null
 
     init {
         // Collect StateFlow dari service — langsung update UI tanpa polling
@@ -171,6 +177,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun disconnect(context: Context) {
+        pingJob?.cancel()
+        pingJob = null
         JhopanVpnService.stop(context)
         isConnected = false
         isConnecting = false
@@ -254,7 +262,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun restartVpn(context: Context) {
-        isRestarting = true  // Set flag sebelum restart
+        isRestarting = true
         Log.d("MainViewModel", "Restarting VPN (isRestarting=$isRestarting, proxyActive=$isProxySharingActive)")
         JhopanVpnService.stop(context)
         isConnecting = true
@@ -263,23 +271,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             delay(1500)
             val uri = buildVlessUri()
             JhopanVpnService.start(context, uri, dns1, dns2, autoReconnect)
-            var attempts = 0
-            while (attempts < 15) {
-                delay(1000)
-                if (JhopanVpnService.isRunning) {
-                    isConnected = true
-                    isConnecting = false
-                    statusText = "Connected"
-                    isRestarting = false  // Reset flag setelah berhasil
-                    Log.d("MainViewModel", "VPN restarted successfully (proxyActive=$isProxySharingActive)")
-                    return@launch
+            // Wait for a terminal state with no polling — StateFlow push, max 20s
+            val finalState = withTimeoutOrNull(20_000L) {
+                JhopanVpnService.state.first {
+                    it == JhopanVpnService.VpnState.CONNECTED || it == JhopanVpnService.VpnState.FAILED
                 }
-                attempts++
             }
             isConnecting = false
-            isConnected = JhopanVpnService.isRunning
+            isConnected = (finalState == JhopanVpnService.VpnState.CONNECTED)
             statusText = if (isConnected) "Connected" else "Reconnect failed"
-            isRestarting = false  // Reset flag meski gagal
+            isRestarting = false
+            if (isConnected) Log.d("MainViewModel", "VPN restarted successfully (proxyActive=$isProxySharingActive)")
         }
     }
 
@@ -352,27 +354,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // then stops — no background coroutine or CPU/radio wake after that.
 
     private fun startPingLoop() {
-        viewModelScope.launch(Dispatchers.IO) {
+        pingJob?.cancel()
+        // Reuse one proxy description across all 3 bursts
+        val proxy = Proxy(
+            Proxy.Type.SOCKS,
+            InetSocketAddress("127.0.0.1", com.jhopanstore.vpn.core.XrayManager.SOCKS_PORT)
+        )
+        pingJob = viewModelScope.launch(Dispatchers.IO) {
             var best: Long = Long.MAX_VALUE
             var gotResult = false
             repeat(3) { attempt ->
                 if (!isConnected) return@launch
                 try {
-                    val proxy = Proxy(
-                        Proxy.Type.SOCKS,
-                        InetSocketAddress("127.0.0.1", com.jhopanstore.vpn.core.XrayManager.SOCKS_PORT)
-                    )
-                    val url = URL(pingUrl)
-                    val conn = url.openConnection(proxy) as HttpURLConnection
+                    val conn = URL(pingUrl).openConnection(proxy) as HttpURLConnection
                     conn.connectTimeout = 5000
                     conn.readTimeout = 5000
                     conn.requestMethod = "HEAD"
+                    // Do NOT call disconnect() — lets HTTP keep-alive pool reuse the socket
+                    // for subsequent burst pings, saving a full TCP+TLS round-trip each time
 
                     val start = System.currentTimeMillis()
                     conn.connect()
                     val code = conn.responseCode
                     val elapsed = System.currentTimeMillis() - start
-                    conn.disconnect()
 
                     if (code in 200..399 && elapsed < best) {
                         best = elapsed
@@ -380,12 +384,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         pingResult = "$elapsed ms"
                     }
                 } catch (_: Exception) {
-                    // ignore individual ping failure; report timeout only if all three fail
+                    // ignore individual failure; report timeout only if all three fail
                 }
                 if (attempt < 2) delay(800)
             }
             if (!gotResult) pingResult = "Timeout"
-            // Burst complete — no further background work
+            pingJob = null  // burst complete, free reference
         }
     }
 }
