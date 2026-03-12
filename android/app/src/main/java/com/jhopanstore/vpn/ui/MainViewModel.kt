@@ -28,6 +28,11 @@ import java.net.Proxy
 import java.net.URL
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
+    companion object {
+        // Compiled once — avoids per-call Regex instantiation in detectHotspotIp()
+        private val HOTSPOT_IP_172_REGEX = Regex("^172\\.(1[6-9]|2[0-9]|3[0-1])\\..*")
+    }
+
     private val appContext = application.applicationContext
 
     // Connection fields — address includes port, e.g. "example.com:443"
@@ -184,6 +189,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun disconnect(context: Context) {
+        timeoutJob?.cancel()
+        timeoutJob = null
         pingJob?.cancel()
         pingJob = null
         JhopanVpnService.stop(context)
@@ -242,7 +249,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     // 172.16.x.x - 172.31.x.x (jarang tapi mungkin)
                     val isPrivateRange = ip.startsWith("192.168.") || 
                                         ip.startsWith("10.") ||
-                                        ip.matches(Regex("^172\\.(1[6-9]|2[0-9]|3[0-1])\\..*"))
+                                        ip.matches(HOTSPOT_IP_172_REGEX)
                     
                     if (isPrivateRange) {
                         // Return IP ASLI device, JANGAN ubah jadi .1!

@@ -97,10 +97,13 @@ object Tun2socksManager {
                 name = "tun2socks-monitor"
             }.start()
 
-            // Give it a moment to initialize
-            Thread.sleep(500)
-            val alive = nativeIsAlive(processPid)
-            Log.d(TAG, "tun2socks alive: $alive")
+            // Poll until alive — avg ~50ms, worst case 500ms (10 × 50ms)
+            var alive = false
+            for (i in 0 until 10) {
+                if (nativeIsAlive(processPid)) { alive = true; break }
+                Thread.sleep(50)
+            }
+            if (!alive) Log.w(TAG, "tun2socks not alive after 500ms poll")
             alive
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start tun2socks", e)

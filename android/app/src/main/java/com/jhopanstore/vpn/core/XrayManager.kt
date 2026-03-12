@@ -49,12 +49,9 @@ object XrayManager {
     fun resolveDomain(host: String): String? {
         return try {
             val addresses = InetAddress.getAllByName(host)
-            Log.d(TAG, "DNS results for $host: ${addresses.map { it.hostAddress }}")
             val ipv4 = addresses.firstOrNull { it is Inet4Address }
             val selected = ipv4 ?: addresses.firstOrNull()
-            val ip = selected?.hostAddress
-            Log.d(TAG, "Resolved $host -> $ip (IPv4 preferred: ${ipv4 != null})")
-            ip
+            selected?.hostAddress
         } catch (e: Exception) {
             Log.w(TAG, "Failed to resolve $host: ${e.message}")
             null
@@ -183,7 +180,6 @@ object XrayManager {
                 put("protocol", "freedom")
                 put("settings", JSONObject().apply { put("domainStrategy", "UseIPv4") })
             })
-            put(JSONObject().apply { put("tag", "block"); put("protocol", "blackhole") })
             if (cloudflare) {
                 put(JSONObject().apply { put("tag", "dns-out"); put("protocol", "dns") })
             }

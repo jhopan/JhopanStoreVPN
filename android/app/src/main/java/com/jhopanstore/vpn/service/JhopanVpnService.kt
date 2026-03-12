@@ -265,26 +265,29 @@ class JhopanVpnService : VpnService() {
                 }
             }
 
-            // Start Xray core via libXray (in-process)
+            // Start Xray core via libXray (in-process) — iterative retry, no stack accumulation
             if (isStopping) return
 
-            val started = XrayManager.start(this, cfg, dns1, dns2, resolvedIp)
-            if (!started) {
-                Log.e(TAG, "Failed to start Xray")
-                if (autoReconnect && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-                    reconnectAttempts++
-                    val delay = 3000L * reconnectAttempts
-                    Log.w(TAG, "Retrying in ${delay}ms (attempt $reconnectAttempts)")
-                    updateNotification("Retry ($reconnectAttempts)...")
-                    Thread.sleep(delay)
-                    connect(vlessUri, dns1, dns2)
-                    return
+            var started = false
+            while (!started && !isStopping) {
+                started = XrayManager.start(this, cfg, dns1, dns2, resolvedIp)
+                if (!started) {
+                    if (autoReconnect && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                        reconnectAttempts++
+                        val delay = 3000L * reconnectAttempts
+                        Log.w(TAG, "Retrying Xray start in ${delay}ms (attempt $reconnectAttempts)")
+                        updateNotification("Retry ($reconnectAttempts)...")
+                        Thread.sleep(delay)
+                    } else {
+                        Log.e(TAG, "Failed to start Xray — giving up")
+                        _state.value = VpnState.FAILED
+                        updateNotification("Xray start failed")
+                        stopSelf()
+                        return
+                    }
                 }
-                _state.value = VpnState.FAILED
-                updateNotification("Xray start failed")
-                stopSelf()
-                return
             }
+            if (isStopping) { XrayManager.stop(); return }
 
             // Probe SOCKS5 port until ready — max 10s (typically ready in 200-500ms)
             updateNotification("Waiting for Xray...")

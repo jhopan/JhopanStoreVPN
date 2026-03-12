@@ -25,7 +25,8 @@ android {
         }
 
         ndk {
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+            // All supported ABIs — splits{} below produces per-ABI APKs + universal
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
         }
     }
 
@@ -75,6 +76,27 @@ android {
         }
         jniLibs {
             useLegacyPackaging = true
+        }
+    }
+
+    // ─── Per-ABI APK Splits ───────────────────────────────────────────────────
+    // Produces separate lightweight APKs per architecture + one universal APK.
+    //
+    // Output APKs (./gradlew assembleRelease):
+    //   app-arm64-v8a-release.apk    ~most Android phones 2016+  (recommended)
+    //   app-armeabi-v7a-release.apk  ~older 32-bit ARM phones
+    //   app-x86_64-release.apk       ~emulators, some Chromebooks
+    //   app-x86-release.apk          ~legacy x86 emulators
+    //   app-universal-release.apk    ~all ABIs bundled (largest, sideload-friendly)
+    //
+    // For Play Store multi-APK, assign unique versionCodes per ABI:
+    //   arm64-v8a=4x, x86_64=3x, armeabi-v7a=2x, x86=1x  (x = base versionCode)
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
+            isUniversalApk = true
         }
     }
 }
