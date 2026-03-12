@@ -17,15 +17,16 @@ android {
         applicationId = "com.jhopanstore.vpn"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "2.1.0"
 
         vectorDrawables {
             useSupportLibrary = true
         }
 
         ndk {
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+            // All supported ABIs — splits{} below produces per-ABI APKs + universal
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
         }
     }
 
@@ -77,6 +78,27 @@ android {
             useLegacyPackaging = true
         }
     }
+
+    // ─── Per-ABI APK Splits ───────────────────────────────────────────────────
+    // Produces separate lightweight APKs per architecture + one universal APK.
+    //
+    // Output APKs (./gradlew assembleRelease):
+    //   app-arm64-v8a-release.apk    ~most Android phones 2016+  (recommended)
+    //   app-armeabi-v7a-release.apk  ~older 32-bit ARM phones
+    //   app-x86_64-release.apk       ~emulators, some Chromebooks
+    //   app-x86-release.apk          ~legacy x86 emulators
+    //   app-universal-release.apk    ~all ABIs bundled (largest, sideload-friendly)
+    //
+    // For Play Store multi-APK, assign unique versionCodes per ABI:
+    //   arm64-v8a=4x, x86_64=3x, armeabi-v7a=2x, x86=1x  (x = base versionCode)
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
+            isUniversalApk = true
+        }
+    }
 }
 
 dependencies {
@@ -88,8 +110,6 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2")
     implementation("androidx.activity:activity-compose:1.8.1")
-    implementation("androidx.datastore:datastore-preferences:1.0.0")
-
     // Jetpack Compose
     implementation(platform("androidx.compose:compose-bom:2023.10.01"))
     implementation("androidx.compose.ui:ui")

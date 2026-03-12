@@ -49,12 +49,9 @@ object XrayManager {
     fun resolveDomain(host: String): String? {
         return try {
             val addresses = InetAddress.getAllByName(host)
-            Log.d(TAG, "DNS results for $host: ${addresses.map { it.hostAddress }}")
             val ipv4 = addresses.firstOrNull { it is Inet4Address }
             val selected = ipv4 ?: addresses.firstOrNull()
-            val ip = selected?.hostAddress
-            Log.d(TAG, "Resolved $host -> $ip (IPv4 preferred: ${ipv4 != null})")
-            ip
+            selected?.hostAddress
         } catch (e: Exception) {
             Log.w(TAG, "Failed to resolve $host: ${e.message}")
             null
@@ -93,6 +90,16 @@ object XrayManager {
         val root = JSONObject()
 
         root.put("log", JSONObject().apply { put("loglevel", "none") })
+
+        // Disable per-connection stats tracking — saves CPU on every packet
+        root.put("policy", JSONObject().apply {
+            put("system", JSONObject().apply {
+                put("statsInboundUplink", false)
+                put("statsInboundDownlink", false)
+                put("statsOutboundUplink", false)
+                put("statsOutboundDownlink", false)
+            })
+        })
 
         // -- inbounds --
         root.put("inbounds", JSONArray().apply {
@@ -135,6 +142,17 @@ object XrayManager {
             put("security", cfg.security)
             put("wsSettings", wsSettings)
             if (cfg.security == "tls") put("tlsSettings", tlsSettings)
+            // sockopt: tune the Xray→server TCP connection
+            // - tcpFastOpen:          -1 RTT on reconnect (TFO cookie reuse)
+            // - tcpNoDelay:           disable Nagle on Xray→server, lower latency
+            // - tcpKeepAliveIdle:     start keepalive probes after 60 s idle
+            // - tcpKeepAliveInterval: probe every 30 s → detect dead NAT in ≤30 s
+            put("sockopt", JSONObject().apply {
+                put("tcpFastOpen", true)
+                put("tcpNoDelay", true)
+                put("tcpKeepAliveIdle", 60)
+                put("tcpKeepAliveInterval", 30)
+            })
         }
 
         val serverAddress = resolvedIp ?: cfg.address
@@ -158,9 +176,19 @@ object XrayManager {
                     })
                 })
                 put("streamSettings", streamSettings)
+                // Mux: multiplex many TCP streams over ONE WebSocket/TLS connection.
+                // Each new app connection no longer needs a fresh TLS handshake → fewer
+                // RTTs, lower baterai usage, faster throughput for bursty traffic.
+                put("mux", JSONObject().apply {
+                    put("enabled", true)
+                    put("concurrency", 8)
+                })
             })
-            put(JSONObject().apply { put("tag", "direct"); put("protocol", "freedom") })
-            put(JSONObject().apply { put("tag", "block"); put("protocol", "blackhole") })
+            put(JSONObject().apply {
+                put("tag", "direct")
+                put("protocol", "freedom")
+                put("settings", JSONObject().apply { put("domainStrategy", "UseIPv4") })
+            })
             if (cloudflare) {
                 put(JSONObject().apply { put("tag", "dns-out"); put("protocol", "dns") })
             }
@@ -252,16 +280,6 @@ object XrayManager {
 
             // Generate Xray config JSON
             val configJson = buildConfig(cfg, dns1, dns2, resolvedIp)
-            Log.d(TAG, "Config content:\n$configJson")
-
-            // Log libXray version
-            try {
-                val verResponse = LibXray.xrayVersion()
-                val (_, version) = parseResponse(verResponse)
-                Log.i(TAG, "libXray Xray-core version: $version")
-            } catch (e: Exception) {
-                Log.w(TAG, "Could not get Xray version: ${e.message}")
-            }
 
             // Create base64-encoded request using libXray's factory method
             val requestBase64 = LibXray.newXrayRunFromJSONRequest(datDir, mphCachePath, configJson)
@@ -282,7 +300,7 @@ object XrayManager {
                 try {
                     Thread.sleep(3000) // initial delay — let Xray fully stabilize
                     while (!intentionalStop && LibXray.getXrayState()) {
-                        Thread.sleep(5000) // check every 5 seconds — saves CPU wake cycles
+                        Thread.sleep(10000) // check every 10 seconds — reduces CPU wake cycles
                     }
                     if (!intentionalStop) {
                         Log.w(TAG, "Xray stopped unexpectedly")

@@ -5,7 +5,6 @@ import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import java.io.File
-import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
@@ -64,7 +63,9 @@ object Tun2socksManager {
                 bin.absolutePath,
                 "-device", "fd://$tunFd",
                 "-proxy", "socks5://127.0.0.1:$socksPort",
-                "-loglevel", "warn"
+                "-loglevel", "silent",
+                "-tcp-no-delay",        // disable Nagle's algorithm — lower latency
+                "-udp-timeout", "30s"   // default 5 min is excessive; free fd/memory faster
             )
             Log.i(TAG, "Starting tun2socks: ${cmd.joinToString(" ")}")
 
@@ -79,21 +80,11 @@ object Tun2socksManager {
             pipeReadFd = result[1]
             Log.i(TAG, "tun2socks started with PID $processPid")
 
-            // Read child's stdout/stderr and log it
+            // loglevel is silent — no output expected; close pipe fd immediately
+            // to avoid blocking reader thread and orphan file descriptor
             if (pipeReadFd >= 0) {
-                val readPfd = ParcelFileDescriptor.adoptFd(pipeReadFd)
-                Thread {
-                    try {
-                        FileInputStream(readPfd.fileDescriptor).bufferedReader().forEachLine { line ->
-                            Log.d(TAG, "tun2socks: $line")
-                        }
-                    } catch (_: Exception) { /* stream closed */ }
-                    try { readPfd.close() } catch (_: Exception) {}
-                    Log.w(TAG, "tun2socks output stream ended")
-                }.apply {
-                    isDaemon = true
-                    name = "tun2socks-log"
-                }.start()
+                try { ParcelFileDescriptor.adoptFd(pipeReadFd).close() } catch (_: Exception) {}
+                pipeReadFd = -1
             }
 
             // Monitor process death in background
@@ -101,12 +92,18 @@ object Tun2socksManager {
                 val exitCode = nativeWaitProcess(processPid)
                 Log.w(TAG, "tun2socks exited with code $exitCode")
                 processPid = -1
+            }.apply {
+                isDaemon = true
+                name = "tun2socks-monitor"
             }.start()
 
-            // Give it a moment to initialize
-            Thread.sleep(500)
-            val alive = nativeIsAlive(processPid)
-            Log.d(TAG, "tun2socks alive: $alive")
+            // Poll until alive — avg ~50ms, worst case 500ms (10 × 50ms)
+            var alive = false
+            for (i in 0 until 10) {
+                if (nativeIsAlive(processPid)) { alive = true; break }
+                Thread.sleep(50)
+            }
+            if (!alive) Log.w(TAG, "tun2socks not alive after 500ms poll")
             alive
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start tun2socks", e)

@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"time"
 )
@@ -77,61 +78,65 @@ func NewTunDevice(cfg Config) (*TunDevice, error) {
 // Start begins tun2socks process
 func (t *TunDevice) Start() error {
 	t.mu.Lock()
-	defer t.mu.Unlock()
-
 	if t.running {
+		t.mu.Unlock()
 		return fmt.Errorf("TUN device already running")
 	}
 
-	// Find tun2socks binary
+	// Find tun2socks binary (cross-platform)
 	exePath, err := os.Executable()
 	if err != nil {
+		t.mu.Unlock()
 		return fmt.Errorf("failed to get executable path: %w", err)
 	}
 	exeDir := filepath.Dir(exePath)
-	tun2socksPath := filepath.Join(exeDir, "bin", "tun2socks.exe")
+	tun2socksName := "tun2socks"
+	if runtime.GOOS == "windows" {
+		tun2socksName = "tun2socks.exe"
+	}
 
-	// Check if binary exists
+	tun2socksPath := filepath.Join(exeDir, "bin", tun2socksName)
 	if _, err := os.Stat(tun2socksPath); os.IsNotExist(err) {
-		// Try in current working directory
 		if wd, err := os.Getwd(); err == nil {
-			tun2socksPath = filepath.Join(wd, "bin", "tun2socks.exe")
+			tun2socksPath = filepath.Join(wd, "bin", tun2socksName)
 			if _, err := os.Stat(tun2socksPath); os.IsNotExist(err) {
-				return fmt.Errorf("tun2socks.exe not found in bin/ folder\nPlease download from: https://github.com/xjasonlyu/tun2socks/releases")
+				t.mu.Unlock()
+				return fmt.Errorf("%s not found in bin/ folder\nPlease download from: https://github.com/xjasonlyu/tun2socks/releases", tun2socksName)
 			}
 		}
 	}
 
 	log.Printf("[TUN] Using tun2socks binary: %s", tun2socksPath)
 
-	// Build tun2socks command
-	// tun2socks -device tun://tun0 -proxy socks5://127.0.0.1:10809
 	args := []string{
 		"-device", fmt.Sprintf("tun://%s", t.Name),
 		"-proxy", fmt.Sprintf("socks5://%s", t.socksAddr),
 		"-loglevel", "silent",
+		"-tcp-no-delay",
+		"-udp-timeout", "30s",
 	}
 
 	t.cmd = exec.Command(tun2socksPath, args...)
 	t.cmd.Stdout = os.Stdout
 	t.cmd.Stderr = os.Stderr
 
-	// Start tun2socks process
 	if err := t.cmd.Start(); err != nil {
+		t.mu.Unlock()
 		return fmt.Errorf("failed to start tun2socks: %w\nNote: Requires admin/root privileges", err)
 	}
 
 	t.running = true
 	log.Printf("[TUN] Started tun2socks: %s -> %s (PID: %d)", t.Name, t.socksAddr, t.cmd.Process.Pid)
 
-	// Monitor process
+	// processDone is closed when tun2socks exits (used for early-crash detection below)
+	processDone := make(chan struct{})
 	go func() {
 		err := t.cmd.Wait()
 		t.mu.Lock()
 		wasRunning := t.running
 		t.running = false
 		t.mu.Unlock()
-
+		close(processDone)
 		if wasRunning {
 			if err != nil {
 				log.Printf("[TUN] tun2socks exited with error: %v", err)
@@ -141,8 +146,15 @@ func (t *TunDevice) Start() error {
 		}
 	}()
 
-	// Wait a bit for TUN device to be ready
-	time.Sleep(1 * time.Second)
+	t.mu.Unlock()
+
+	// Wait up to 1s for TUN device to initialize; bail out immediately on early crash
+	select {
+	case <-processDone:
+		return fmt.Errorf("tun2socks exited immediately after start")
+	case <-time.After(1 * time.Second):
+		// still running — TUN device is ready
+	}
 
 	return nil
 }
@@ -173,9 +185,6 @@ func (t *TunDevice) Stop() {
 // Close closes the TUN device and cleans up
 func (t *TunDevice) Close() error {
 	t.Stop()
-
-	// Wait a bit for process to fully stop
-	time.Sleep(500 * time.Millisecond)
 
 	// Remove routing
 	if err := t.removeRouting(); err != nil {

@@ -53,13 +53,11 @@ func main() {
 
 	// State
 	var (
-		xrayProc    *xray.Process
-		tunDevice   *tun.TunDevice
-		pinger      *ping.Pinger
-		connected   bool
-		connectMu   sync.Mutex
-		autoReconWg sync.WaitGroup
-		stopAutoRec chan struct{}
+		xrayProc  *xray.Process
+		tunDevice *tun.TunDevice
+		pinger    *ping.Pinger
+		connected bool
+		connectMu sync.Mutex
 	)
 
 	// Forward-declare UI
@@ -71,11 +69,6 @@ func main() {
 	doDisconnect := func() {
 		connectMu.Lock()
 		connected = false
-		// Stop auto-reconnect
-		if stopAutoRec != nil {
-			close(stopAutoRec)
-			stopAutoRec = nil
-		}
 		connectMu.Unlock()
 
 		if pinger != nil {
@@ -271,46 +264,6 @@ func main() {
 				}
 			})
 			pinger.Start()
-
-			// Auto-reconnect monitor
-			if settingsPage.IsAutoReconnect() {
-				connectMu.Lock()
-				stopAutoRec = make(chan struct{})
-				ch := stopAutoRec
-				connectMu.Unlock()
-
-				autoReconWg.Add(1)
-				go func() {
-					defer autoReconWg.Done()
-					ticker := time.NewTicker(10 * time.Second)
-					defer ticker.Stop()
-					for {
-						select {
-						case <-ch:
-							return
-						case <-ticker.C:
-							if xrayProc != nil && !xrayProc.IsRunning() {
-								connectMu.Lock()
-								if connected {
-									connected = false
-									connectMu.Unlock()
-									log.Println("[JhopanStoreVPN] Detected xray stopped, reconnecting...")
-									// Close TUN device before reconnecting
-									if tunDevice != nil {
-										tunDevice.Close()
-										tunDevice = nil
-									}
-									mainPage.SetStatus("Reconnecting...")
-									time.Sleep(2 * time.Second)
-									doConnect()
-									return
-								}
-								connectMu.Unlock()
-							}
-						}
-					}
-				}()
-			}
 		}()
 	}
 
@@ -488,7 +441,7 @@ func main() {
 		doDisconnect()
 	})
 
-	_ = widget.NewLabel("v1.0.0")
+	_ = widget.NewLabel("v2.1.0")
 
 	w.ShowAndRun()
 

@@ -213,7 +213,15 @@ class JhopanVpnService : VpnService() {
                                 val xrayStarted = XrayManager.start(this, parsedCfg, lastDns1, lastDns2, resolvedIp)
                                 if (!xrayStarted) continue
 
-                                Thread.sleep(1000)
+                                // Probe SOCKS5 port — proceed as soon as ready, max 5s
+                                var portUp = false
+                                for (probe in 0 until 20) {
+                                    try {
+                                        java.net.Socket("127.0.0.1", XrayManager.SOCKS_PORT).use { portUp = true; break }
+                                    } catch (_: Exception) {}
+                                    Thread.sleep(250)
+                                }
+                                if (!portUp) { XrayManager.stop(); continue }
 
                                 // Re-establish TUN
                                 val builder = Builder()
@@ -222,7 +230,7 @@ class JhopanVpnService : VpnService() {
                                     .addRoute("0.0.0.0", 0)
                                     .addDnsServer(lastDns1.ifBlank { "8.8.8.8" })
                                     .addDnsServer(lastDns2.ifBlank { "8.8.4.4" })
-                                    .setMtu(1500)
+                                    .setMtu(1400)
                                 builder.addDisallowedApplication(packageName)
                                 tunFd = builder.establish()
                                 if (tunFd == null) { XrayManager.stop(); continue }
@@ -257,29 +265,48 @@ class JhopanVpnService : VpnService() {
                 }
             }
 
-            // Start Xray core via libXray (in-process)
+            // Start Xray core via libXray (in-process) — iterative retry, no stack accumulation
             if (isStopping) return
 
-            val started = XrayManager.start(this, cfg, dns1, dns2, resolvedIp)
-            if (!started) {
-                Log.e(TAG, "Failed to start Xray")
-                if (autoReconnect && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-                    reconnectAttempts++
-                    val delay = 3000L * reconnectAttempts
-                    Log.w(TAG, "Retrying in ${delay}ms (attempt $reconnectAttempts)")
-                    updateNotification("Retry ($reconnectAttempts)...")
-                    Thread.sleep(delay)
-                    connect(vlessUri, dns1, dns2)
-                    return
+            var started = false
+            while (!started && !isStopping) {
+                started = XrayManager.start(this, cfg, dns1, dns2, resolvedIp)
+                if (!started) {
+                    if (autoReconnect && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                        reconnectAttempts++
+                        val delay = 3000L * reconnectAttempts
+                        Log.w(TAG, "Retrying Xray start in ${delay}ms (attempt $reconnectAttempts)")
+                        updateNotification("Retry ($reconnectAttempts)...")
+                        Thread.sleep(delay)
+                    } else {
+                        Log.e(TAG, "Failed to start Xray — giving up")
+                        _state.value = VpnState.FAILED
+                        updateNotification("Xray start failed")
+                        stopSelf()
+                        return
+                    }
                 }
+            }
+            if (isStopping) { XrayManager.stop(); return }
+
+            // Probe SOCKS5 port until ready — max 10s (typically ready in 200-500ms)
+            updateNotification("Waiting for Xray...")
+            var portReady = false
+            for (probe in 0 until 40) {
+                if (isStopping) { XrayManager.stop(); return }
+                try {
+                    java.net.Socket("127.0.0.1", XrayManager.SOCKS_PORT).use { portReady = true; break }
+                } catch (_: Exception) {}
+                Thread.sleep(250)
+            }
+            if (!portReady) {
+                Log.e(TAG, "Xray SOCKS5 port not ready after 10s")
+                XrayManager.stop()
                 _state.value = VpnState.FAILED
-                updateNotification("Xray start failed")
+                updateNotification("Xray timeout")
                 stopSelf()
                 return
             }
-
-            // Wait for Xray SOCKS proxy to be ready
-            Thread.sleep(1000)
 
             // Establish TUN interface
             val builder = Builder()
@@ -288,7 +315,7 @@ class JhopanVpnService : VpnService() {
                 .addRoute("0.0.0.0", 0)
                 .addDnsServer(dns1.ifBlank { "8.8.8.8" })
                 .addDnsServer(dns2.ifBlank { "8.8.4.4" })
-                .setMtu(1500)
+                .setMtu(1400)
 
             // Exclude our own app as defense-in-depth (protectFd handles this too)
             builder.addDisallowedApplication(packageName)
@@ -406,11 +433,11 @@ class JhopanVpnService : VpnService() {
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 "JhopanStoreVPN",
-                NotificationManager.IMPORTANCE_DEFAULT
+                // LOW: persistent notification without sound/vibration → less battery
+                NotificationManager.IMPORTANCE_LOW
             ).apply {
                 description = "VPN connection status"
-                // Prevent notification removal by system
-                setShowBadge(true)
+                setShowBadge(false)
                 enableLights(false)
                 enableVibration(false)
             }
