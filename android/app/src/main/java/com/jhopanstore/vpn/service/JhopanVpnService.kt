@@ -430,11 +430,11 @@ class JhopanVpnService : VpnService() {
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 "JhopanStoreVPN",
-                NotificationManager.IMPORTANCE_DEFAULT
+                // LOW: persistent notification without sound/vibration → less battery
+                NotificationManager.IMPORTANCE_LOW
             ).apply {
                 description = "VPN connection status"
-                // Prevent notification removal by system
-                setShowBadge(true)
+                setShowBadge(false)
                 enableLights(false)
                 enableVibration(false)
             }

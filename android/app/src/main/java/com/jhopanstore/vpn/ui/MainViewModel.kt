@@ -56,6 +56,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // Job reference so ping burst is cancellable on disconnect
     private var pingJob: Job? = null
+    // Safety timeout job — cancelled as soon as connection resolves (avoids 30s dangling coroutine)
+    private var timeoutJob: Job? = null
 
     init {
         // Collect StateFlow dari service — langsung update UI tanpa polling
@@ -63,6 +65,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             JhopanVpnService.state.collectLatest { state ->
                 when (state) {
                     JhopanVpnService.VpnState.CONNECTED -> {
+                        timeoutJob?.cancel()  // connection resolved — stop wasting 30s
                         isConnected = true
                         isConnecting = false
                         statusText = "Connected"
@@ -75,6 +78,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         statusText = "Connecting..."
                     }
                     JhopanVpnService.VpnState.FAILED -> {
+                        timeoutJob?.cancel()  // connection resolved — stop wasting 30s
                         isConnected = false
                         isConnecting = false
                         statusText = "Connection failed"
@@ -166,13 +170,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         JhopanVpnService.start(context, uri, dns1, dns2, autoReconnect)
 
         // Safety timeout: jika service hang total (tidak emit state apapun),
-        // paksa reset setelah 30 detik agar field tidak terkunci selamanya
-        viewModelScope.launch {
+        // paksa reset setelah 30 detik agar field tidak terkunci selamanya.
+        // Stored as timeoutJob so it can be cancelled immediately when state resolves.
+        timeoutJob?.cancel()
+        timeoutJob = viewModelScope.launch {
             delay(30_000)
             if (isConnecting && !isConnected) {
                 isConnecting = false
                 statusText = "Connection timeout"
             }
+            timeoutJob = null
         }
     }
 
