@@ -217,8 +217,10 @@ class JhopanVpnService : VpnService() {
                                 var portUp = false
                                 for (probe in 0 until 20) {
                                     try {
-                                        java.net.Socket("127.0.0.1", XrayManager.SOCKS_PORT).use { portUp = true; break }
+                                        java.net.Socket("127.0.0.1", XrayManager.SOCKS_PORT).close()
+                                        portUp = true
                                     } catch (_: Exception) {}
+                                    if (portUp) break
                                     Thread.sleep(250)
                                 }
                                 if (!portUp) { XrayManager.stop(); continue }
@@ -295,8 +297,10 @@ class JhopanVpnService : VpnService() {
             for (probe in 0 until 40) {
                 if (isStopping) { XrayManager.stop(); return }
                 try {
-                    java.net.Socket("127.0.0.1", XrayManager.SOCKS_PORT).use { portReady = true; break }
+                    java.net.Socket("127.0.0.1", XrayManager.SOCKS_PORT).close()
+                    portReady = true
                 } catch (_: Exception) {}
+                if (portReady) break
                 Thread.sleep(250)
             }
             if (!portReady) {
