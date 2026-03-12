@@ -6,6 +6,10 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
@@ -88,6 +92,7 @@ class JhopanVpnService : VpnService() {
     private var tunFd: ParcelFileDescriptor? = null
     private var reconnectWakeLock: PowerManager.WakeLock? = null
     private var serviceWakeLock: PowerManager.WakeLock? = null
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
     // State for auto-reconnect
     private var lastVlessUri: String? = null
@@ -124,6 +129,9 @@ class JhopanVpnService : VpnService() {
             }
         })
         Log.i(TAG, "Registered DialerController for socket protection")
+
+        // Monitor network changes — reconnect when network comes back after loss
+        registerNetworkCallback()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -411,6 +419,7 @@ class JhopanVpnService : VpnService() {
     }
 
     override fun onDestroy() {
+        unregisterNetworkCallback()
         disconnect()
         super.onDestroy()
         
@@ -429,6 +438,62 @@ class JhopanVpnService : VpnService() {
         disconnect()
         stopSelf()
         super.onRevoke()
+    }
+
+    // --- Network callback ---
+
+    /**
+     * Register a NetworkCallback that triggers reconnect when network is restored
+     * while the VPN is in DISCONNECTED or FAILED state.
+     *
+     * Scenario: user is connected → network drops → Xray dies → state goes FAILED/DISCONNECTED
+     * → network comes back → this callback fires → VPN reconnects automatically.
+     *
+     * We intentionally do NOT reconnect if state is CONNECTING or CONNECTED to avoid
+     * racing against an in-progress connection attempt.
+     */
+    private fun registerNetworkCallback() {
+        val cm = getSystemService(ConnectivityManager::class.java) ?: return
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                val uri = lastVlessUri ?: return
+                if (!isStopping && autoReconnect) {
+                    val current = _state.value
+                    if (current == VpnState.DISCONNECTED || current == VpnState.FAILED) {
+                        Log.i(TAG, "Network restored (state=$current) — triggering reconnect")
+                        _state.value = VpnState.CONNECTING
+                        updateNotification("Reconnecting...")
+                        Thread {
+                            Thread.sleep(1500) // allow network to fully stabilize
+                            connect(uri, lastDns1, lastDns2)
+                        }.apply {
+                            isDaemon = true
+                            name = "vpn-net-reconnect"
+                            start()
+                        }
+                    }
+                }
+            }
+        }
+        val request = NetworkRequest.Builder()
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .build()
+        try {
+            cm.registerNetworkCallback(request, callback)
+            networkCallback = callback
+            Log.i(TAG, "NetworkCallback registered")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to register NetworkCallback: ${e.message}")
+        }
+    }
+
+    private fun unregisterNetworkCallback() {
+        val cb = networkCallback ?: return
+        networkCallback = null
+        try {
+            getSystemService(ConnectivityManager::class.java)?.unregisterNetworkCallback(cb)
+            Log.i(TAG, "NetworkCallback unregistered")
+        } catch (_: Exception) {}
     }
 
     // --- Notification helpers ---

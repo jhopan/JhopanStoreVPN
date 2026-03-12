@@ -1,688 +1,366 @@
-# JhopanStoreVPN
+﻿# JhopanStoreVPN
 
 <p align="center">
   <img src="assets/icon256.png" alt="JhopanStoreVPN Logo" width="128">
 </p>
 
 <p align="center">
-  <b>Lightweight VLESS VPN Client with Full System-Wide Routing</b>
+  <b>VLESS VPN Client — System-Wide Routing untuk semua aplikasi</b>
 </p>
 
 <p align="center">
-  <a href="https://github.com/jhopan/JhopanStoreVPN/releases">
-    <img src="https://img.shields.io/github/v/release/jhopan/JhopanStoreVPN?style=flat-square" alt="Release">
+  <a href="https://github.com/jhopan/JhopanStoreVPN/releases/latest">
+    <img src="https://img.shields.io/github/v/release/jhopan/JhopanStoreVPN?style=flat-square&label=Versi%20Terbaru" alt="Release">
   </a>
   <a href="https://github.com/jhopan/JhopanStoreVPN/blob/main/LICENSE">
     <img src="https://img.shields.io/github/license/jhopan/JhopanStoreVPN?style=flat-square" alt="License">
   </a>
-  <a href="https://github.com/jhopan/JhopanStoreVPN/stargazers">
-    <img src="https://img.shields.io/github/stars/jhopan/JhopanStoreVPN?style=flat-square" alt="Stars">
-  </a>
 </p>
 
 <p align="center">
-  <b>Cross-Platform:</b> Windows • Linux • macOS • Android<br>
-  <b>Developed by <a href="https://github.com/jhopan">JhopanStore</a></b>
+  <b>Platform:</b> Windows • Linux • macOS • Android<br>
+  <b>Dibuat oleh <a href="https://github.com/jhopan">JhopanStore</a></b>
 </p>
 
 ---
 
-## 🌟 Highlights
+## 📥 Download — Pilih yang sesuai perangkat kamu
 
-- 🚀 **True System-Wide VPN** — Routes ALL applications (WhatsApp, Telegram, Discord, games, browsers)
-- 🔒 **VLESS Protocol** — Modern, efficient, and secure via Xray-core
-- 🖥️ **TUN Mode** — Virtual network interface for transparent routing (Desktop)
-- 📱 **Native Android VPN** — VpnService API without root
-- 🎯 **Single Instance** — No duplicate processes, smart mutex/lock system
-- ⚡ **Auto Admin Elevation** — UAC prompt on Windows, seamless sudo on Linux/macOS
-- 🌐 **Hotspot Sharing** — Share VPN connection via WiFi (Android)
-- 🎨 **Clean Modern UI** — Fyne v2 (Desktop), Material Design 3 (Android)
-- 📊 **Real-Time Stats** — Ping monitoring, traffic statistics
-- 🔄 **Auto-Reconnect** — Stable connection with crash recovery
+> **Halaman download:** [Releases Page](https://github.com/jhopan/JhopanStoreVPN/releases/latest)
 
 ---
-
-## 📋 Features
-
-### 🖥️ Desktop (Windows / Linux / macOS)
-
-#### Core VPN Features
-
-- ✅ **TUN Mode** - Virtual network interface for true system-wide routing
-- ✅ **All Apps Work** - WhatsApp Desktop, Telegram, Discord, Steam, Epic Games, etc.
-- ✅ **VLESS Protocol** - WebSocket + TLS via Xray-core
-- ✅ **Auto Admin Elevation** - UAC prompt (Windows) / sudo (Linux/macOS) on startup
-- ✅ **External tun2socks** - Reliable TUN device management via proven binary
-- ✅ **Smart Routing Cleanup** - Internet automatically restored on disconnect
-
-#### UI & Usability
-
-- ✅ **Modern GUI** - Clean interface powered by Fyne v2
-- ✅ **System Tray** - Minimize to tray, stays in background
-- ✅ **Single Instance** - Prevents duplicate processes (mutex/lock)
-- ✅ **Clipboard Import** - Paste `vless://` links directly
-- ✅ **Real-Time Ping** - HTTP latency monitoring
-- ✅ **Auto-Reconnect** - Automatic recovery on connection loss
-- ✅ **No Console Window** - Pure GUI application
-
-### 📱 Android (APK)
-
-#### Core VPN Features
-
-- ✅ **VpnService API** - True system-wide VPN (no root required)
-- ✅ **VLESS via libXray** - Native performance with Xray-core AAR
-- ✅ **Hotspot Sharing** - Share VPN with other devices (HTTP proxy port 10809)
-- ✅ **Always-On VPN** - Foreground service prevents system kill
-- ✅ **Config Persistence** - Settings automatically saved
-
-#### UI & Stats
-
-- ✅ **Material Design 3** - Modern Android UI with Jetpack Compose
-- ✅ **Real-Time Statistics** - Upload/download speed, traffic counter
-- ✅ **QR Code Import** - Scan config from QR codes
-- ✅ **Battery Optimized** - Efficient background operation
-
----
-
-## 📥 Download
-
----
-
-## 📥 Download
-
-### 💾 Latest Release
-
-Go to [**Releases Page**](https://github.com/jhopan/JhopanStoreVPN/releases/latest) to download the latest version (v2.0.0).
-
-### 🖥️ Desktop
-
-| Platform          | File                          | Size   | Requirements             |
-| ----------------- | ----------------------------- | ------ | ------------------------ |
-| **Windows 10/11** | `JhopanStoreVPN-windows.zip`  | ~42 MB | Administrator privileges |
-| **Linux (x64)**   | `JhopanStoreVPN-linux.tar.gz` | ~38 MB | Root/sudo access         |
-| **macOS (ARM64)** | `JhopanStoreVPN-macos.tar.gz` | ~39 MB | macOS 11+                |
 
 ### 📱 Android
 
-| File                 | Size   | Requirements          |
-| -------------------- | ------ | --------------------- |
-| `JhopanStoreVPN.apk` | ~30 MB | Android 7.0+ (API 24) |
+| File | Cocok untuk | Keterangan |
+|---|---|---|
+| `app-phone-arm64-v8a-release.apk` | **HP Android modern (2016+)** | ⭐ Paling direkomendasikan — paling kecil & cepat |
+| `app-phone-armeabi-v7a-release.apk` | HP Android lama 32-bit | Untuk HP lama seperti Galaxy J1, S5 |
+| `app-phone-universal-release.apk` | Semua HP ARM | Kalau tidak yakin HP kamu apa, download ini |
+| `app-full-arm64-v8a-release.apk` | HP + emulator x86_64 | Versi lengkap arm64 |
+| `app-full-universal-release.apk` | Semua ABI (HP + emulator) | Paling besar, untuk emulator Android Studio / BlueStacks |
 
-> **⚠️ Important Notes:**
->
-> - **Desktop**: TUN mode requires **administrator/root privileges** to create virtual network interfaces
-> - **Windows**: UAC prompt will appear automatically on startup
-> - **Linux/macOS**: Run with `sudo` or configure passwordless sudo for convenience
-> - **Android**: Enable "Install from Unknown Sources" in settings
-
----
-
-## 🚀 Quick Start
-
-### 🖥️ Desktop Setup
-
-#### Windows
-
-```powershell
-# 1. Extract downloaded zip
-# 2. Double-click JhopanStoreVPN.exe
-# 3. Click "Yes" on UAC prompt
-# 4. Enter VLESS server details or paste vless:// link
-# 5. Click CONNECT
-```
-
-**First Run**: Windows may prompt to install **Wintun driver** — click "Yes" to install.
-
-#### Linux
-
-```bash
-# Extract archive
-tar -xzf JhopanStoreVPN-linux.tar.gz
-cd JhopanStoreVPN-linux
-
-# Run with sudo
-sudo ./JhopanStoreVPN
-
-# Or use the launcher script
-sudo ./launch.sh
-```
-
-#### macOS
-
-```bash
-# Extract archive
-tar -xzf JhopanStoreVPN-macos.tar.gz
-
-# Run the .app bundle
-open JhopanStoreVPN.app
-
-# Or run from terminal with sudo
-sudo ./JhopanStoreVPN.app/Contents/MacOS/JhopanStoreVPN
-```
-
-### 📱 Android Setup
-
-1. **Enable Unknown Sources**
-   - Go to Settings → Security → Unknown Sources
-   - Or Settings → Apps → Special Access → Install Unknown Apps
-
-2. **Install APK**
-   - Download `JhopanStoreVPN.apk`
-   - Tap to install
-   - Grant installation permission
-
-3. **First Connection**
-   - Open app
-   - Enter VLESS server details OR scan QR code
-   - Tap **CONNECT**
-   - Approve VPN permission request
-   - (Optional) Enable **Hotspot Sharing** in settings
-
-4. **Hotspot Sharing** (Optional)
-   - Enable "Hotspot Sharing" toggle
-   - Turn on WiFi hotspot
-   - Other devices connect to your hotspot
-   - They automatically use VPN (proxy on port 10809)
+> **Bingung pilih yang mana?**
+> - HP biasa keluaran 2016 ke atas → **`app-phone-arm64-v8a-release.apk`**
+> - Tidak tahu spesifikasi HP → **`app-phone-universal-release.apk`**
+> - Emulator (Android Studio, BlueStacks, NoxPlayer) → **`app-full-universal-release.apk`**
+> - HP 32-bit lama → **`app-phone-armeabi-v7a-release.apk`**
 
 ---
 
-## 🎯 Usage Tips
+### 🖥️ Desktop
 
-### Desktop
+| File | Platform | Untuk siapa |
+|---|---|---|
+| `JhopanStoreVPN-windows.zip` | Windows 10/11 | Semua PC/laptop Windows 64-bit |
+| `JhopanStoreVPN-linux.tar.gz` | Ubuntu, Debian, Fedora, dll | Semua PC/laptop Linux 64-bit |
+| `JhopanStoreVPN-macos-arm64.tar.gz` | macOS Apple Silicon | Mac dengan chip **M1/M2/M3/M4** |
+| `JhopanStoreVPN-macos-amd64.tar.gz` | macOS Intel | Mac dengan **Intel Core i5/i7/i9** |
+| `JhopanStoreVPN-macos-universal.tar.gz` | macOS semua | Jalan di Mac manapun (ARM + Intel) |
 
-**System Tray**
+> **Cara cek Mac kamu:**
+> Apple menu (🍎) → About This Mac → lihat bagian **Chip** atau **Processor**
+> - Tertulis "Apple M1/M2/M3/M4" → pilih **`macos-arm64`**
+> - Tertulis "Intel Core" → pilih **`macos-amd64`**
+> - Tidak yakin → pilih **`macos-universal`** (bisa dipakai di keduanya)
 
-- Close button (X) → Hides to tray
-- Right-click tray icon → Show window or Exit
-- Exit properly to ensure routing cleanup
+---
 
-**Config Management**
-
-- Clipboard button: paste `vless://` links
-- Manual entry: server address, port, UUID, path
-- Settings are saved automatically
-
-**Monitoring**
-
-- Ping display shows latency in real-time
-- Green = Connected, Red = Disconnected
-- Auto-reconnect on connection loss
+## 🚀 Cara Pakai
 
 ### Android
 
-**Battery Optimization**
+1. Download APK sesuai tabel di atas
+2. Buka file APK → Install (`Allow from this source` jika diminta)
+3. Buka app → masukkan **Address** (`example.com:443`) dan **UUID**
+4. Atau tap ikon **Paste** (kanan atas) untuk import `vless://...` link
+5. Tap **CONNECT** → setujui izin VPN
+6. Status berubah "Connected" ✓
 
-- Disable battery optimization for JhopanStoreVPN
-- This prevents system from killing VPN service
-- Settings → Battery → Battery Optimization → JhopanStoreVPN → Don't Optimize
+> **Penting:** Saat pertama buka, app akan meminta kamu menonaktifkan Battery Optimization.
+> Lakukan ini agar VPN tidak terputus saat layar mati.
 
-**Autostart Permission** (Xiaomi, Huawei, OPPO, etc.)
+### Windows
 
-- Some manufacturers require autostart permission
-- Settings → Apps → Autostart → Enable for JhopanStoreVPN
+1. Extract `JhopanStoreVPN-windows.zip`
+2. Double-click `JhopanStoreVPN.exe`
+3. Klik **Yes** pada UAC prompt (perlu untuk buat TUN interface)
+4. Isi Address + UUID atau paste `vless://` link → CONNECT
 
-**Split Tunneling** (Coming Soon)
+### Linux
 
-- Currently all apps route through VPN
-- Split tunneling feature in future release
+```bash
+tar -xzf JhopanStoreVPN-linux.tar.gz
+cd JhopanStoreVPN-linux
+sudo ./JhopanStoreVPN
+```
+
+### macOS
+
+```bash
+# Pilih sesuai Mac kamu:
+tar -xzf JhopanStoreVPN-macos-arm64.tar.gz     # M1/M2/M3/M4
+# atau
+tar -xzf JhopanStoreVPN-macos-amd64.tar.gz     # Intel
+# atau
+tar -xzf JhopanStoreVPN-macos-universal.tar.gz  # Tidak yakin
+
+sudo open JhopanStoreVPN.app
+```
 
 ---
 
-## Build from Source
+## ⚙️ Pengaturan (Settings)
 
-### Desktop Requirements
+Semua pengaturan **disimpan otomatis** ke storage dan tidak hilang saat app ditutup atau di-update.
 
-- Go 1.21+
-- GCC (MinGW on Windows)
-- Platform graphics libraries:
-  - **Linux**: `sudo apt install gcc pkg-config libgl1-mesa-dev xorg-dev`
-  - **macOS**: `xcode-select --install`
-  - **Windows**: MinGW-w64
+| Setting | Keterangan | Default |
+|---|---|---|
+| **Path** | WebSocket path di VLESS URI | `/vless` |
+| **SNI** | Server Name Indication TLS (isi jika berbeda domain) | (dari Address) |
+| **Host** | HTTP Host header WebSocket | (dari Address) |
+| **DNS 1 / DNS 2** | DNS resolver saat VPN aktif | `8.8.8.8` / `8.8.4.4` |
+| **Ping URL** | URL untuk tes latensi (HTTP HEAD request) | `https://dns.google` |
+| **Auto Reconnect** | Otomatis sambung ulang jika koneksi putus | ON |
+| **Allow Insecure TLS** | Skip verifikasi sertifikat TLS (untuk server self-signed) | ON |
 
-### Desktop Build
+> **DNS & HTTP Ping:**
+> - Bisa diganti kapan saja — tidak ada yang di-overwrite update
+> - Perubahan DNS berlaku di **koneksi berikutnya** (perlu disconnect → connect ulang)
+> - Perubahan Ping URL berlaku di **ping berikutnya** setelah connect
+> - Format DNS: alamat IPv4, contoh `1.1.1.1`, `8.8.8.8`, `208.67.222.222`
 
-```bash
-# 1. Clone repository
-git clone https://github.com/jhopan/JhopanStoreVPN.git
-cd JhopanStoreVPN
+---
 
-# 2. Download tun2socks binary
-# Windows: Download from https://github.com/xjasonlyu/tun2socks/releases
-# Place tun2socks.exe in bin/ folder
+## 🌐 Bagikan VPN ke Device Lain (Hotspot Sharing) — Android
 
-# 3. Build
-# Linux / macOS
-go build -ldflags="-s -w" -o JhopanStoreVPN .
+Share VPN ke laptop, HP lain, atau konsol via proxy — tanpa install apapun di device tujuan.
 
-# Windows (no console window)
-go build -ldflags="-s -w -H windowsgui" -o JhopanStoreVPN.exe .
-```
+**Langkah:**
+1. Aktifkan **Hotspot WiFi** di HP kamu
+2. Sambungkan device lain ke hotspot tersebut
+3. Di JhopanStoreVPN → tap ikon 📡 (kanan atas) → aktifkan **Proxy VPN**
+4. Catat IP yang tertera (contoh: `192.168.43.1`)
+5. Setting proxy di device lain sesuai tabel:
 
-**Required files next to executable:**
+| Device | Tipe proxy | Cara setting |
+|---|---|---|
+| **Android** | HTTP (10809) | WiFi → Tahan jaringan → Ubah → Opsi Lanjutan → Proxy Manual → `[IP]:10809` |
+| **iOS** | HTTP (10809) | Settings → Wi-Fi → (i) → Configure Proxy → Manual → `[IP]:10809` |
+| **Windows** | HTTP (10809) | Settings → Network → Proxy → Manual → `[IP]:10809` |
+| **Windows** | SOCKS5 (10808) | Via Proxifier atau SocksCap → Server: `[IP]:10808` |
+| **Linux** | HTTP (10809) | Settings → Network → Proxy → HTTP: `[IP]:10809` |
+| **Linux** | SOCKS5 (10808) | Terminal: `export all_proxy=socks5://[IP]:10808` |
+| **macOS** | HTTP (10809) | System Settings → Network → [WiFi] → Proxies → Web Proxy: `[IP]:10809` |
+| **macOS** | SOCKS5 (10808) | System Settings → Network → [WiFi] → Proxies → SOCKS Proxy: `[IP]:10808` |
 
-- `xray` or `xray.exe` - Download from [Xray-core Releases](https://github.com/XTLS/Xray-core/releases)
-- `bin/tun2socks.exe` (Windows) - Download from [tun2socks Releases](https://github.com/xjasonlyu/tun2socks/releases)
+> **Port 10809 = HTTP proxy** — dipakai Android, iOS, browser, sistem operasi umum
+> **Port 10808 = SOCKS5 proxy** — dipakai tools lanjutan (Proxifier, terminal, dll), mendukung UDP
 
-### Android Build
+---
 
-```bash
-# 1. Prerequisites
-# - Android Studio Hedgehog+ (2023.1.1+)
-# - JDK 17+
-# - Android SDK 34+
+## 🔄 Auto-Reconnect
 
-# 2. Build APK
-cd android
-./gradlew assembleRelease
+Ketika **Auto Reconnect** diaktifkan, VPN otomatis menyambung ulang dalam dua skenario:
 
-# Output: android/app/build/outputs/apk/release/app-release.apk
-```
+1. **Xray crash** — proses Xray berhenti tiba-tiba → reconnect segera
+2. **Jaringan kembali** — sinyal hilang lalu pulih → VPN reconnect otomatis (tidak perlu buka app)
 
-## 🏗️ Technical Architecture
+Delay antar percobaan menggunakan **exponential backoff** (makin lama tiap gagal, max 60 detik):
 
-### 🖥️ Desktop TUN Mode
+| Percobaan | Delay |
+|---|---|
+| 1 | 3 detik |
+| 2 | 6 detik |
+| 3 | 12 detik |
+| 4 | 24 detik |
+| 5 | 48 detik |
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  User Applications                                          │
-│  (WhatsApp, Telegram, Discord, Chrome, Games, etc.)        │
-└────────────────────┬────────────────────────────────────────┘
-                     │ All network traffic
-                     ↓
-┌────────────────────────────────────────────────────────────┐
-│  TUN Virtual Network Interface (tun0)                      │
-│  IP: 10.0.0.2  Gateway: 10.0.0.1                          │
-└────────────────────┬───────────────────────────────────────┘
-                     │ Layer 3 packets
-                     ↓
-┌────────────────────────────────────────────────────────────┐
-│  tun2socks Process (External Binary)                       │
-│  Converts TUN packets → SOCKS5 protocol                    │
-└────────────────────┬───────────────────────────────────────┘
-                     │ SOCKS5 protocol
-                     ↓
-┌────────────────────────────────────────────────────────────┐
-│  Xray-core Process (localhost:10809)                       │
-│  VLESS Protocol + WebSocket + TLS                          │
-└────────────────────┬───────────────────────────────────────┘
-                     │ Encrypted VLESS
-                     ↓
-                 Internet → VLESS Server
-```
+Setelah 5 percobaan gagal berturut-turut, VPN berhenti. Perlu connect manual.
 
-**Technical Details:**
+---
 
-- **TUN Device**: Layer 3 virtual network interface created by tun2socks
-- **Routing Table**: All traffic (0.0.0.0/0) routed via TUN gateway (10.0.0.1)
-- **Platform Commands**:
-  - Windows: `netsh interface ip set address`, `route add`
-  - Linux: `ip link set up`, `ip route add default`
-  - macOS: `ifconfig`, `route add`
-- **Process Management**:
-  - Go manages tun2socks lifecycle via `exec.Command`
-  - Single instance lock: Named mutex (Windows) / flock (Linux/macOS)
-  - Admin elevation: Manifest `requireAdministrator` (Windows)
-- **Cleanup**: Explicit route deletion on disconnect ensures internet restoration
+## 🏗️ Arsitektur Teknis
 
-### 📱 Android VpnService
+### Android
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│  User Applications                                          │
-│  (All Android apps)                                         │
-└────────────────────┬────────────────────────────────────────┘
-                     │ All network traffic
-                     ↓
-┌────────────────────────────────────────────────────────────┐
-│  Android VpnService API                                     │
-│  TUN interface (tun0) managed by Android OS                │
-└────────────────────┬───────────────────────────────────────┘
-                     │ Packets intercepted by VPNService
-                     ↓
-┌────────────────────────────────────────────────────────────┐
-│  libXray.aar (Native Library)                              │
-│  Xray-core compiled for Android (ARM64 + x86_64)          │
-│  VLESS Protocol + WebSocket + TLS                          │
-└────────────────────┬───────────────────────────────────────┘
-                     │ Encrypted VLESS
-                     ↓
-                 Internet → VLESS Server
+Semua aplikasi
+      ↓
+Android VpnService — TUN interface (kernel)
+      ↓
+tun2socks (native binary via JNI fork+exec, preserves TUN fd)
+      ↓
+Xray-core via libXray.aar (in-process — tidak ada subprocess)
+   SOCKS5 inbound  127.0.0.1:10808  (dari tun2socks)
+   HTTP   inbound  0.0.0.0:10809    (saat hotspot sharing aktif)
+   VLESS outbound  WebSocket + TLS
+      ↓
+Internet → VLESS Server
 ```
 
-**Additional Features:**
+### Desktop
 
-- **Hotspot Sharing**: HTTP proxy on port 10809 for WiFi clients
-- **Foreground Service**: Notification prevents system kill
-- **Config Storage**: Shared Preferences with encryption
-- **Traffic Stats**: Real-time upload/download counter
+```
+Semua aplikasi
+      ↓
+TUN virtual interface (tun0)
+      ↓
+tun2socks binary (subprocess) → SOCKS5 127.0.0.1:10808
+      ↓
+Xray binary (subprocess)
+   VLESS outbound  WebSocket + TLS
+      ↓
+Internet → VLESS Server
+```
 
 ---
 
 ## 🛠️ Troubleshooting
 
-### 🖥️ Desktop Issues
+### Android
 
 <details>
-<summary><b>"Failed to start tun2socks" or "Permission denied"</b></summary>
+<summary><b>VPN sering terputus saat layar mati</b></summary>
 
-**Cause**: Application not running with administrator/root privileges.
+**Penyebab:** Android membatasi background service untuk hemat baterai.
 
-**Solution**:
-
-- **Windows**: Right-click → "Run as Administrator"
-- **Linux/macOS**: Run with `sudo ./JhopanStoreVPN`
-- **Note**: UAC manifest should trigger admin prompt automatically on Windows
+**Solusi:**
+1. Buka app → tap banner kuning → **Perbaiki** → izinkan "Unrestricted"
+2. Atau: Settings → Battery → Battery Optimization → JhopanStoreVPN → **Don't Optimize**
+3. HP Xiaomi/OPPO/Vivo: aktifkan **Autostart** di Settings → Apps → Autostart
 
 </details>
 
 <details>
-<summary><b>"tun2socks.exe not found" or "Binary not found"</b></summary>
+<summary><b>"Connected" tapi internet tidak jalan</b></summary>
 
-**Cause**: tun2socks binary missing from `bin/` folder.
-
-**Solution**:
-
-1. Download from [tun2socks releases](https://github.com/xjasonlyu/tun2socks/releases/tag/v2.5.2)
-2. Extract the appropriate binary:
-   - Windows: `tun2socks-windows-amd64.exe` → `bin/tun2socks.exe`
-   - Linux: `tun2socks-linux-amd64` → `bin/tun2socks`
-   - macOS: `tun2socks-darwin-amd64` → `bin/tun2socks`
-3. Ensure `bin/` folder is next to the executable
+**Solusi:**
+1. Cek address, UUID, path, SNI sudah benar (satu karakter salah = gagal)
+2. Pastikan server VLESS kamu aktif
+3. Disconnect → Connect ulang
+4. Coba ganti DNS ke `1.1.1.1` di Settings
 
 </details>
 
 <details>
-<summary><b>Windows: "Wintun driver installation" prompt</b></summary>
+<summary><b>APK tidak bisa diinstall ("App not installed")</b></summary>
 
-**Cause**: Wintun driver (required for TUN mode) not installed.
-
-**Solution**:
-
-- Click "Yes" or "Install" when prompted
-- This is a one-time installation
-- Driver is required for TUN interface creation
-- From: [Wintun by WireGuard](https://www.wintun.net/)
+**Solusi:**
+1. Settings → Security → Install Unknown Apps → izinkan
+2. Coba install **`app-phone-universal-release.apk`** (support semua HP ARM)
+3. Hapus dulu versi lama jika ada (uninstall dulu)
 
 </details>
 
 <details>
-<summary><b>"Connection successful but no internet"</b></summary>
+<summary><b>Hotspot sharing tidak bekerja di device lain</b></summary>
 
-**Possible Causes**:
+**Solusi:**
+1. Pastikan switch **Proxy VPN** ON di halaman Hotspot
+2. Gunakan IP yang tertera di app (bukan 192.168.1.1 atau gateway router)
+3. Di device lain, matikan VPN lain yang mungkin aktif
+4. Coba port 10809 (HTTP proxy) sebelum 10808 (SOCKS5)
 
-1. Xray process not running
-2. VLESS server unreachable
-3. Routing table misconfigured
+</details>
 
-**Diagnostics**:
+### Desktop
+
+<details>
+<summary><b>"tun2socks not found" atau "Binary not found"</b></summary>
+
+File binary sudah ada di dalam release zip/tar. Kalau hilang, download dari
+[tun2socks releases v2.6.0](https://github.com/xjasonlyu/tun2socks/releases/tag/v2.6.0):
+- Windows: `tun2socks-windows-amd64.zip` → ekstrak → `bin/tun2socks.exe`
+- Linux: `tun2socks-linux-amd64.zip` → ekstrak → `bin/tun2socks`
+- macOS: sesuai arsitektur → `bin/tun2socks`
+
+</details>
+
+<details>
+<summary><b>Internet tidak pulih setelah disconnect</b></summary>
 
 ```bash
-# Windows: Check if Xray is running
-tasklist | findstr xray
-
-# Linux/macOS: Check Xray process
-ps aux | grep xray
-
-# Windows: Check routing table
-route print 0.0.0.0
-
-# Linux: Check routing
-ip route show
-
-# macOS: Check routing
-netstat -nr | grep default
-```
-
-**Solution**:
-
-- Verify VLESS server address, port, UUID are correct
-- Check firewall isn't blocking Xray (port 10809)
-- Try disconnecting and reconnecting
-- Check Xray logs in application directory
-
-</details>
-
-<details>
-<summary><b>"Application already running" or won't start second time</b></summary>
-
-**Cause**: Single instance lock prevents duplicate processes (this is intentional).
-
-**Solution**:
-
-- Check system tray for running instance
-- Right-click tray icon → Show window
-- Or properly exit via tray menu → Exit
-- If stuck: Kill process manually:
-  - Windows: Task Manager → End JhopanStoreVPN.exe
-  - Linux/macOS: `killall JhopanStoreVPN`
-
-</details>
-
-<details>
-<summary><b>"Internet doesn't restore after disconnect"</b></summary>
-
-**Cause**: Routing cleanup failed or tun2socks crashed.
-
-**Solution**:
-
-```bash
-# Windows: Reset routing table
+# Windows — reset routing
 route -f
-# Then reconnect to WiFi/Ethernet
+# Lalu reconnect WiFi / cabut-pasang kabel Ethernet
 
-# Linux: Flush routing cache
+# Linux
 sudo ip route flush cache
 sudo systemctl restart NetworkManager
 
-# macOS: Reset network
+# macOS
 sudo route flush
-# System Preferences → Network → Assist me → Diagnostics
 ```
 
 </details>
 
-### 📱 Android Issues
-
 <details>
-<summary><b>"VPN disconnects randomly" or "Service killed"</b></summary>
+<summary><b>Windows: "Application already running"</b></summary>
 
-**Cause**: System battery optimization or aggressive task killer.
-
-**Solution**:
-
-1. **Disable Battery Optimization**:
-   - Settings → Battery → Battery Optimization
-   - Find JhopanStoreVPN → Don't Optimize
-
-2. **Enable Autostart** (Xiaomi, Huawei, OPPO, etc.):
-   - Settings → Apps → Autostart
-   - Enable for JhopanStoreVPN
-
-3. **Lock in Recent Apps**:
-   - Recent apps → JhopanStoreVPN → Lock icon
-
-4. **Remove from Battery Saver**:
-   - Some ROMs require explicit exemption from battery saver
-
-</details>
-
-<details>
-<summary><b>"Hotspot Sharing not working"</b></summary>
-
-**Cause**: Port 10809 blocked or hotspot restrictions.
-
-**Solution**:
-
-1. Ensure "Enable Hotspot Sharing" is toggled ON in settings
-2. Check firewall isn't blocking port 10809
-3. Test from client device:
-   ```bash
-   # Set proxy on client device
-   Host: <Your hotspot IP>
-   Port: 10809
-   ```
-4. Some carriers/ROMs restrict hotspot tethering
-5. Try disabling and re-enabling hotspot
-
-</details>
-
-<details>
-<summary><b>"Unable to install APK" or "App not installed"</b></summary>
-
-**Solution**:
-
-1. Enable "Install from Unknown Sources":
-   - Settings → Security → Unknown Sources (Android 7-9)
-   - Settings → Apps → Special Access → Install Unknown Apps → Chrome/File Manager (Android 10+)
-
-2. Check storage space (needs ~50 MB free)
-
-3. Uninstall old version first if upgrading:
-
-   ```bash
-   adb uninstall com.jhopanstore.vpn
-   ```
-
-4. If signature mismatch: completely uninstall old version
-
-</details>
-
-<details>
-<summary><b>"Connection failed" or "Server unreachable"</b></summary>
-
-**Diagnostics**:
-
-1. Verify VLESS config: server address, port, UUID, path
-2. Test server reachability from browser
-3. Check server logs for connection attempts
-4. Try importing config via QR code to avoid typos
-5. Ensure server supports WebSocket + TLS
+Cek system tray (pojok kanan bawah taskbar). Kalau ada ikon app, klik kanan → Show.
+Kalau tidak ada: Task Manager → cari `JhopanStoreVPN.exe` → End Task → buka lagi.
 
 </details>
 
 ---
 
-## ❓ FAQ
+## 🔨 Build dari Source
 
-<details>
-<summary><b>Why does desktop require administrator/root privileges?</b></summary>
-
-TUN mode creates virtual network interfaces and modifies system routing tables. These are privileged operations that require elevated permissions.
-
-**Alternatives without admin**:
-
-- Proxy mode (not implemented, TUN-only by design)
-- Browser extensions (limited to browser only)
-
-</details>
-
-<details>
-<summary><b>Is my traffic encrypted?</b></summary>
-
-Yes! All traffic is encrypted using:
-
-- **VLESS protocol** with TLS (Transport Layer Security)
-- **WebSocket** over TLS for additional obfuscation
-- End-to-end encryption between client and VLESS server
-
-</details>
-
-<details>
-<summary><b>Does JhopanStoreVPN log any data?</b></summary>
-
-No. The application does not log:
-
-- Websites visited
-- Traffic content
-- DNS queries
-- Connection history
-
-Local logs (if enabled) only contain:
-
-- Connection status
-- Error messages for debugging
-- Performance metrics (latency)
-
-</details>
-
-<details>
-<summary><b>Can I use JhopanStoreVPN for gaming?</b></summary>
-
-Yes! TUN mode supports:
-
-- ✅ Steam, Epic Games, Battle.net
-- ✅ Multiplayer games (CS:GO, Dota 2, League of Legends)
-- ✅ Xbox/PlayStation network connectivity
-- ⚠️ Note: VPN adds latency, may affect competitive gaming
-
-</details>
-
-<details>
-<summary><b>What's the difference between proxy mode and TUN mode?</b></summary>
-
-| Feature             | Proxy Mode            | TUN Mode (JhopanStoreVPN) |
-| ------------------- | --------------------- | ------------------------- |
-| Requires admin      | No                    | Yes                       |
-| Works with all apps | No (only proxy-aware) | Yes (system-wide)         |
-| Gaming support      | No                    | Yes                       |
-| Windows apps        | No                    | Yes                       |
-| Configuration       | Manual per-app        | Automatic                 |
-
-</details>
-
-<details>
-<summary><b>Can I run JhopanStoreVPN and other VPNs simultaneously?</b></summary>
-
-No. Only one VPN/TUN interface can be active at a time. Attempting to run multiple VPNs will cause routing conflicts.
-
-</details>
-
-<details>
-<summary><b>How do I check if VPN is working?</b></summary>
-
-**Desktop**:
+### Android
 
 ```bash
-# Check your public IP
-curl ifconfig.me
+# Requirements: Android Studio, JDK 17+, Android SDK 35
 
-# Should show your VPN server IP, not your real IP
+cd android
+
+# APK untuk HP (ARM only — lebih kecil):
+./gradlew assemblePhoneRelease
+
+# APK untuk semua ABI (termasuk emulator):
+./gradlew assembleFullRelease
+
+# Output: android/app/build/outputs/apk/phone/release/
+#         android/app/build/outputs/apk/full/release/
 ```
 
-**Android**:
+### Desktop
 
-- Check notification: should show "Connected" with upload/download stats
-- Visit: https://ifconfig.me in browser (should show VPN server IP)
+```bash
+# Requirements: Go 1.21+, GCC/Clang, platform libs
 
-</details>
+# Linux (perlu: gcc, pkg-config, libgl1-mesa-dev, xorg-dev)
+sudo apt install gcc pkg-config libgl1-mesa-dev xorg-dev
+go build -ldflags="-s -w" -o JhopanStoreVPN .
 
-<details>
-<summary><b>What happens if VPN disconnects?</b></summary>
+# Windows (MinGW-w64, tanpa console window)
+go build -ldflags="-s -w -H windowsgui" -o JhopanStoreVPN.exe .
 
-- **Desktop**: Auto-reconnect attempts every 5 seconds
-- **Android**: Auto-reconnect (if Always-On VPN enabled)
-- **Routing**: Automatically cleaned up, internet restored
-- **Kill Switch**: Not implemented (traffic leaks during disconnection)
+# macOS (perlu Xcode Command Line Tools)
+xcode-select --install
+go build -ldflags="-s -w" -o JhopanStoreVPN .
+```
 
-</details>
+File yang harus ada di sebelah executable:
+- `xray` / `xray.exe` — dari [Xray-core Releases](https://github.com/XTLS/Xray-core/releases)
+- `bin/tun2socks` / `bin/tun2socks.exe` — dari [tun2socks Releases](https://github.com/xjasonlyu/tun2socks/releases)
 
 ---
 
 ## Credits
 
 - **[JhopanStore](https://github.com/jhopan)** — Developer & maintainer
-- **[Xray-core](https://github.com/XTLS/Xray-core)** — VLESS/VMess/Trojan proxy engine (MPL-2.0 license)
-- **[libXray](https://github.com/XTLS/libXray)** — Android wrapper for Xray-core (MPL-2.0 license)
-- **[tun2socks](https://github.com/xjasonlyu/tun2socks)** — TUN device to SOCKS5 proxy adapter (GPL-3.0 license)
-- **[Fyne](https://github.com/fyne-io/fyne)** — Cross-platform GUI toolkit for Go (BSD 3-Clause license)
-- **[golang.org/x/sys](https://pkg.go.dev/golang.org/x/sys)** — Go extended system packages (BSD 3-Clause license)
+- **[Xray-core](https://github.com/XTLS/Xray-core)** — VLESS proxy engine (MPL-2.0)
+- **[libXray](https://github.com/XTLS/libXray)** — Android wrapper untuk Xray-core (MPL-2.0)
+- **[tun2socks](https://github.com/xjasonlyu/tun2socks)** — TUN ke SOCKS5 bridge (GPL-3.0)
+- **[Fyne](https://github.com/fyne-io/fyne)** — GUI toolkit Go (BSD 3-Clause)
 
-## License
+## Lisensi
 
-MIT — Copyright (c) 2026 JhopanStore
+MIT — © 2026 JhopanStore
 
 ---
 
 <p align="center">
-  <b>Questions or issues?</b> Open an <a href="https://github.com/jhopan/JhopanStoreVPN/issues">issue</a> on GitHub
+  Ada pertanyaan atau bug? Buka <a href="https://github.com/jhopan/JhopanStoreVPN/issues">issue</a> di GitHub
 </p>
