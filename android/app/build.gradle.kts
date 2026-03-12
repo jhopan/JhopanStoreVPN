@@ -23,16 +23,30 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
-
-        ndk {
-            // All supported ABIs — splits{} below produces per-ABI APKs + universal
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
-        }
     }
 
     externalNativeBuild {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")
+        }
+    }
+
+    // ─── Build Flavors ────────────────────────────────────────────────────────
+    // 'full'  → arm64-v8a + armeabi-v7a + x86_64 + x86  (phones + emulators)
+    // 'phone' → arm64-v8a + armeabi-v7a only             (real phones only, smaller)
+    flavorDimensions += "target"
+    productFlavors {
+        create("full") {
+            dimension = "target"
+            ndk {
+                abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
+            }
+        }
+        create("phone") {
+            dimension = "target"
+            ndk {
+                abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+            }
         }
     }
 
@@ -86,17 +100,19 @@ android {
     }
 
     // ─── Per-ABI APK Splits ───────────────────────────────────────────────────
-    // Produces separate lightweight APKs per architecture + one universal APK.
+    // Combined with flavorDimensions above, Gradle produces per-ABI + per-flavor APKs:
     //
-    // Output APKs (./gradlew assembleRelease):
-    //   app-arm64-v8a-release.apk    ~most Android phones 2016+  (recommended)
-    //   app-armeabi-v7a-release.apk  ~older 32-bit ARM phones
-    //   app-x86_64-release.apk       ~emulators, some Chromebooks
-    //   app-x86-release.apk          ~legacy x86 emulators
-    //   app-universal-release.apk    ~all ABIs bundled (largest, sideload-friendly)
+    // 'full' flavor  (assembleFullRelease):
+    //   app-full-arm64-v8a-release.apk    → modern ARM64 phones (recommended)
+    //   app-full-armeabi-v7a-release.apk  → older 32-bit ARM phones
+    //   app-full-x86_64-release.apk       → x86_64 emulators / Chromebooks
+    //   app-full-x86-release.apk          → legacy x86 emulators
+    //   app-full-universal-release.apk    → ALL 4 ABIs bundled (universal-all)
     //
-    // For Play Store multi-APK, assign unique versionCodes per ABI:
-    //   arm64-v8a=4x, x86_64=3x, armeabi-v7a=2x, x86=1x  (x = base versionCode)
+    // 'phone' flavor (assemblePhoneRelease):
+    //   app-phone-arm64-v8a-release.apk   → arm64 only
+    //   app-phone-armeabi-v7a-release.apk → armeabi only
+    //   app-phone-universal-release.apk   → ARM-only universal (smaller, phone-focused)
     splits {
         abi {
             isEnable = true

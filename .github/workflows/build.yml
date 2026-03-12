@@ -253,65 +253,54 @@ jobs:
           # Ensure Xcode command line tools are available
           xcode-select --install 2>/dev/null || echo "Xcode tools already installed"
 
-      - name: Download tun2socks binary (universal arm64+amd64)
+      - name: Download tun2socks (arm64, amd64, universal)
         run: |
-          # arm64 — Apple Silicon (M1/M2/M3)
+          mkdir -p bin
+          # Apple Silicon (M1/M2/M3)
           curl -L -o tun2socks-arm64.zip "https://github.com/xjasonlyu/tun2socks/releases/download/v2.5.2/tun2socks-darwin-arm64.zip"
           unzip -o tun2socks-arm64.zip -d tun2socks-arm64-tmp
-          ARM64=$(find tun2socks-arm64-tmp -type f ! -name "*.zip" | head -1)
-          # amd64 — Intel Mac
+          find tun2socks-arm64-tmp -type f ! -name "*.zip" | head -1 | xargs -I{} cp {} bin/tun2socks-arm64
+          chmod +x bin/tun2socks-arm64
+          # Intel Mac
           curl -L -o tun2socks-amd64.zip "https://github.com/xjasonlyu/tun2socks/releases/download/v2.5.2/tun2socks-darwin-amd64.zip"
           unzip -o tun2socks-amd64.zip -d tun2socks-amd64-tmp
-          AMD64=$(find tun2socks-amd64-tmp -type f ! -name "*.zip" | head -1)
-          mkdir -p bin
-          lipo -create "$ARM64" "$AMD64" -output bin/tun2socks
-          chmod +x bin/tun2socks
-          echo "tun2socks archs: $(lipo -archs bin/tun2socks)"
+          find tun2socks-amd64-tmp -type f ! -name "*.zip" | head -1 | xargs -I{} cp {} bin/tun2socks-amd64
+          chmod +x bin/tun2socks-amd64
+          # Universal fat binary
+          lipo -create bin/tun2socks-arm64 bin/tun2socks-amd64 -output bin/tun2socks-universal
+          chmod +x bin/tun2socks-universal
 
-      - name: Download Xray-core (universal arm64+amd64)
+      - name: Download Xray-core (arm64, amd64, universal)
         run: |
-          # arm64 — Apple Silicon (M1/M2/M3)
+          # Apple Silicon (M1/M2/M3)
           curl -L -o xray-arm64.zip "https://github.com/XTLS/Xray-core/releases/latest/download/Xray-macos-arm64-v8a.zip"
           unzip -o xray-arm64.zip -d xray-arm64-tmp
-          ARM64=$(find xray-arm64-tmp -name "xray" ! -name "*.dat" | head -1)
-          # amd64 — Intel Mac
+          find xray-arm64-tmp -name "xray" ! -name "*.dat" | head -1 | xargs -I{} cp {} xray-arm64
+          chmod +x xray-arm64
+          # Intel Mac
           curl -L -o xray-amd64.zip "https://github.com/XTLS/Xray-core/releases/latest/download/Xray-macos-64.zip"
           unzip -o xray-amd64.zip -d xray-amd64-tmp
-          AMD64=$(find xray-amd64-tmp -name "xray" ! -name "*.dat" | head -1)
-          lipo -create "$ARM64" "$AMD64" -output xray
-          chmod +x xray
-          echo "xray archs: $(lipo -archs xray)"
+          find xray-amd64-tmp -name "xray" ! -name "*.dat" | head -1 | xargs -I{} cp {} xray-amd64
+          chmod +x xray-amd64
+          # Universal fat binary
+          lipo -create xray-arm64 xray-amd64 -output xray-universal
+          chmod +x xray-universal
 
-      - name: Build
+      - name: Build (arm64 native, amd64 cross-compile, universal)
         run: |
-          # Clean up any Windows-specific build artifacts
           rm -f resource.syso *.syso
-          # Verify cleanup
-          echo "=== Cleaned build directory ==="
-          ls -la | grep -E '\.syso$' || echo "No .syso files found (good)"
-          # Build for macOS
-          CGO_ENABLED=1 go build -v -ldflags="-s -w" -o JhopanStoreVPN .
+          # arm64 — runs natively on macos-latest (Apple Silicon runner)
+          CGO_ENABLED=1 GOARCH=arm64 go build -v -ldflags="-s -w" -o JhopanStoreVPN-arm64 .
+          # amd64 — cross-compile for Intel Mac (Xcode clang supports both via CGO)
+          CGO_ENABLED=1 GOARCH=amd64 go build -v -ldflags="-s -w" -o JhopanStoreVPN-amd64 .
+          # universal fat binary
+          lipo -create JhopanStoreVPN-arm64 JhopanStoreVPN-amd64 -output JhopanStoreVPN-universal
 
-      - name: Package
+      - name: Package (arm64, amd64, universal — 3 separate bundles)
         run: |
-          # Create macOS .app bundle
-          APP="release/JhopanStoreVPN.app"
-          mkdir -p "$APP/Contents/MacOS"
-          mkdir -p "$APP/Contents/MacOS/bin"
-          mkdir -p "$APP/Contents/Resources/assets"
-
-          cp JhopanStoreVPN "$APP/Contents/MacOS/"
-          cp xray "$APP/Contents/MacOS/"
-          cp -r bin "$APP/Contents/MacOS/"
-          cp assets/background.png "$APP/Contents/Resources/assets/"
-          cp assets/icon64.png "$APP/Contents/Resources/assets/"
-          cp assets/icon256.png "$APP/Contents/Resources/assets/"
-          chmod +x "$APP/Contents/MacOS/JhopanStoreVPN"
-          chmod +x "$APP/Contents/MacOS/xray"
-          chmod +x "$APP/Contents/MacOS/bin/tun2socks"
-
-          # Create Info.plist
-          cat > "$APP/Contents/Info.plist" << 'PLIST'
+          mkdir -p release
+          # Write Info.plist once, reused for all 3 bundles
+          cat > /tmp/Info.plist << 'PLIST'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
@@ -337,21 +326,46 @@ jobs:
           </dict>
           </plist>
           PLIST
-          sed -i '' 's/^          //' "$APP/Contents/Info.plist"
+          sed -i '' 's/^          //' /tmp/Info.plist
 
-          cd release && tar czf JhopanStoreVPN-macos.tar.gz JhopanStoreVPN.app
+          for ARCH in arm64 amd64 universal; do
+            APP="release/JhopanStoreVPN-${ARCH}.app"
+            mkdir -p "$APP/Contents/MacOS/bin"
+            mkdir -p "$APP/Contents/Resources/assets"
+            cp "JhopanStoreVPN-${ARCH}"    "$APP/Contents/MacOS/JhopanStoreVPN"
+            cp "xray-${ARCH}"              "$APP/Contents/MacOS/xray"
+            cp "bin/tun2socks-${ARCH}"     "$APP/Contents/MacOS/bin/tun2socks"
+            cp assets/background.png       "$APP/Contents/Resources/assets/"
+            cp assets/icon64.png           "$APP/Contents/Resources/assets/"
+            cp assets/icon256.png          "$APP/Contents/Resources/assets/"
+            cp /tmp/Info.plist             "$APP/Contents/Info.plist"
+            chmod +x "$APP/Contents/MacOS/JhopanStoreVPN"
+            chmod +x "$APP/Contents/MacOS/xray"
+            chmod +x "$APP/Contents/MacOS/bin/tun2socks"
+          done
 
-      - name: Upload Artifact
+          cd release
+          tar czf JhopanStoreVPN-macos-arm64.tar.gz     JhopanStoreVPN-arm64.app
+          tar czf JhopanStoreVPN-macos-amd64.tar.gz     JhopanStoreVPN-amd64.app
+          tar czf JhopanStoreVPN-macos-universal.tar.gz JhopanStoreVPN-universal.app
+
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: JhopanStoreVPN-macos
-          path: release/JhopanStoreVPN-macos.tar.gz
+          path: |
+            release/JhopanStoreVPN-macos-arm64.tar.gz
+            release/JhopanStoreVPN-macos-amd64.tar.gz
+            release/JhopanStoreVPN-macos-universal.tar.gz
 
       - name: Upload to GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: release/JhopanStoreVPN-macos.tar.gz
+          files: |
+            release/JhopanStoreVPN-macos-arm64.tar.gz
+            release/JhopanStoreVPN-macos-amd64.tar.gz
+            release/JhopanStoreVPN-macos-universal.tar.gz
           fail_on_unmatched_files: false
 
   build-android:
@@ -437,7 +451,7 @@ jobs:
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon --stacktrace
+          ./gradlew assembleFullRelease assemblePhoneRelease --no-daemon --stacktrace
 
       - name: Upload libXray.aar artifact (for local development)
         uses: actions/upload-artifact@v4
@@ -452,25 +466,34 @@ jobs:
           VERSION=$(grep -oP 'versionName = "\K[^"]+' android/app/build.gradle.kts | head -1)
           echo "Version: $VERSION"
 
-          # Collect each per-ABI split APK
+          # Per-ABI APKs from 'full' flavor (arm64 + armeabi + x86_64 + x86)
           for ABI in arm64-v8a armeabi-v7a x86_64 x86; do
-            SRC=$(find android/app/build/outputs/apk/release -name "app-${ABI}-release.apk" 2>/dev/null | head -1)
+            SRC=$(find android/app/build/outputs/apk/full/release -name "app-full-${ABI}-release.apk" 2>/dev/null | head -1)
             if [ -n "$SRC" ]; then
               DEST="apks/JhopanStoreVPN-${VERSION}-${ABI}.apk"
               cp "$SRC" "$DEST"
               echo "  ✓ $DEST ($(du -sh "$DEST" | cut -f1))"
             else
-              echo "  ✗ app-${ABI}-release.apk not found"
+              echo "  ✗ app-full-${ABI}-release.apk not found"
             fi
           done
-          # Universal APK — all ABIs bundled (max compatibility, largest file)
-          UNIV=$(find android/app/build/outputs/apk/release -name "app-universal-release.apk" 2>/dev/null | head -1)
-          if [ -n "$UNIV" ]; then
-            DEST="apks/JhopanStoreVPN-${VERSION}-universal.apk"
-            cp "$UNIV" "$DEST"
+          # Universal-phone — ARM only (arm64 + armeabi), no x86 emulator bloat
+          UNIV_PHONE=$(find android/app/build/outputs/apk/phone/release -name "app-phone-universal-release.apk" 2>/dev/null | head -1)
+          if [ -n "$UNIV_PHONE" ]; then
+            DEST="apks/JhopanStoreVPN-${VERSION}-universal-phone.apk"
+            cp "$UNIV_PHONE" "$DEST"
             echo "  ✓ $DEST ($(du -sh "$DEST" | cut -f1))"
           else
-            echo "  ✗ app-universal-release.apk not found"
+            echo "  ✗ app-phone-universal-release.apk not found"
+          fi
+          # Universal-all — all 4 ABIs bundled (max compat incl. emulators)
+          UNIV_ALL=$(find android/app/build/outputs/apk/full/release -name "app-full-universal-release.apk" 2>/dev/null | head -1)
+          if [ -n "$UNIV_ALL" ]; then
+            DEST="apks/JhopanStoreVPN-${VERSION}-universal-all.apk"
+            cp "$UNIV_ALL" "$DEST"
+            echo "  ✓ $DEST ($(du -sh "$DEST" | cut -f1))"
+          else
+            echo "  ✗ app-full-universal-release.apk not found"
           fi
           ls -lh apks/
 
