@@ -29,6 +29,9 @@ func GenerateConfig(vc vless.Config, dns1, dns2 string, allowInsecure bool) ([]b
 	}
 
 	config := map[string]interface{}{
+		"log": map[string]interface{}{
+			"loglevel": "none",
+		},
 		"dns": map[string]interface{}{
 			"servers": []string{dns1, dns2},
 		},
@@ -41,17 +44,7 @@ func GenerateConfig(vc vless.Config, dns1, dns2 string, allowInsecure bool) ([]b
 				"settings": map[string]interface{}{
 					"udp": true,
 				},
-				"sniffing": map[string]interface{}{
-					"enabled":      true,
-					"destOverride": []string{"http", "tls"},
-				},
-			},
-			{
-				"tag":      "http-in",
-				"port":     10809,
-				"listen":   "127.0.0.1",
-				"protocol": "http",
-				"settings": map[string]interface{}{},
+				// sniffing disabled: all traffic routes through proxy, no rule-based override needed
 			},
 		},
 		"outbounds": []map[string]interface{}{

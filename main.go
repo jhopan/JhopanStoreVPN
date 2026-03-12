@@ -194,11 +194,11 @@ func main() {
 				return
 			}
 
-			// Wait for xray HTTP proxy port to be ready (up to 10 seconds)
+			// Wait for xray SOCKS5 port to be ready (up to 10 seconds)
 			mainPage.SetStatus("Waiting for Xray...")
 			portReady := false
 			for i := 0; i < 40; i++ {
-				conn, dialErr := net.DialTimeout("tcp", "127.0.0.1:10809", 250*time.Millisecond)
+				conn, dialErr := net.DialTimeout("tcp", "127.0.0.1:10808", 250*time.Millisecond)
 				if dialErr == nil {
 					conn.Close()
 					portReady = true
@@ -217,7 +217,7 @@ func main() {
 				mainPage.SetStatus("Xray port timeout")
 				return
 			}
-			log.Println("[JhopanStoreVPN] Xray port 10809 is ready")
+			log.Println("[JhopanStoreVPN] Xray SOCKS5 port 10808 is ready")
 
 			// Create and start TUN device
 			mainPage.SetStatus("Creating VPN tunnel...")
@@ -226,8 +226,8 @@ func main() {
 				IP:        "10.0.0.2",
 				Gateway:   "10.0.0.1",
 				DNS:       []string{"8.8.8.8", "1.1.1.1"},
-				MTU:       1500,
-				SocksAddr: "127.0.0.1:10809",
+				MTU:       1400,
+				SocksAddr: "127.0.0.1:10808",
 			}
 			
 			var tunErr error

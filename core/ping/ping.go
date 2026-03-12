@@ -3,20 +3,24 @@ package ping
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
-	"net/url"
+	"strconv"
 	"sync"
 	"time"
 )
 
 const (
 	DefaultPingURL = "https://dns.google"
-	pingInterval   = 5 * time.Second
 	pingTimeout    = 5 * time.Second
+	burstCount     = 3
+	burstInterval  = 800 * time.Millisecond
+	socksProxyAddr = "127.0.0.1:10808"
 )
 
-// Pinger periodically measures HTTP latency through the SOCKS proxy.
+// Pinger fires a short burst of pings on connect, reports the best result, then stops.
+// No background goroutine remains after the burst completes.
 type Pinger struct {
 	mu       sync.Mutex
 	cancel   context.CancelFunc
@@ -33,7 +37,8 @@ func NewPinger(pingURL string, onResult func(latency time.Duration, err error)) 
 	return &Pinger{pingURL: pingURL, onResult: onResult}
 }
 
-// Start begins the ping loop through the local SOCKS proxy.
+// Start fires burstCount pings through the SOCKS5 proxy, reports the best
+// latency result to onResult, then exits — no ongoing CPU or radio usage.
 func (p *Pinger) Start() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -45,13 +50,12 @@ func (p *Pinger) Start() {
 	p.cancel = cancel
 	p.running = true
 
-	proxyURL, _ := url.Parse("http://127.0.0.1:10809")
 	transport := &http.Transport{
-		Proxy: http.ProxyURL(proxyURL),
-		DialContext: (&net.Dialer{
-			Timeout: pingTimeout,
-		}).DialContext,
+		DialContext: func(ctx context.Context, _, addr string) (net.Conn, error) {
+			return dialSOCKS5(ctx, socksProxyAddr, addr)
+		},
 		TLSHandshakeTimeout: pingTimeout,
+		DisableKeepAlives:   true,
 	}
 	client := &http.Client{
 		Transport: transport,
@@ -62,62 +66,138 @@ func (p *Pinger) Start() {
 	}
 
 	go func() {
-		defer client.CloseIdleConnections()
-		ticker := time.NewTicker(pingInterval)
-		defer ticker.Stop()
-		p.doPing(ctx, client)
-		for {
+		defer func() {
+			client.CloseIdleConnections()
+			cancel()
+			p.mu.Lock()
+			p.running = false
+			p.mu.Unlock()
+		}()
+
+		var best time.Duration
+		for i := 0; i < burstCount; i++ {
 			select {
 			case <-ctx.Done():
 				return
-			case <-ticker.C:
-				p.doPing(ctx, client)
+			default:
+			}
+
+			latency, err := p.doPing(ctx, client)
+			if err == nil {
+				if best == 0 || latency < best {
+					best = latency
+					if p.onResult != nil {
+						p.onResult(latency, nil)
+					}
+				}
+			} else if i == burstCount-1 && best == 0 {
+				if p.onResult != nil {
+					p.onResult(0, fmt.Errorf("timeout"))
+				}
+			}
+
+			if i < burstCount-1 {
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(burstInterval):
+				}
 			}
 		}
 	}()
 }
 
-// Stop halts the ping loop.
+// Stop cancels an in-progress burst. Safe to call even after burst has finished.
 func (p *Pinger) Stop() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if !p.running {
-		return
-	}
-	p.running = false
 	if p.cancel != nil {
 		p.cancel()
 	}
 }
 
-func (p *Pinger) doPing(ctx context.Context, client *http.Client) {
+func (p *Pinger) doPing(ctx context.Context, client *http.Client) (time.Duration, error) {
 	start := time.Now()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, p.pingURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, p.pingURL, nil)
 	if err != nil {
-		if p.onResult != nil {
-			p.onResult(0, err)
-		}
-		return
+		return 0, err
 	}
 	resp, err := client.Do(req)
 	if err != nil {
 		if ctx.Err() != nil {
-			return
+			return 0, ctx.Err()
 		}
-		if p.onResult != nil {
-			p.onResult(0, err)
-		}
-		return
+		return 0, err
 	}
 	resp.Body.Close()
-	latency := time.Since(start)
-	if resp.StatusCode >= 400 {
-		if p.onResult != nil {
-			p.onResult(latency, fmt.Errorf("status %d", resp.StatusCode))
-		}
-		return
+	return time.Since(start), nil
+}
+
+// dialSOCKS5 opens a TCP connection through a SOCKS5 proxy without any
+// external dependencies — implements just the no-auth subset of RFC 1928.
+func dialSOCKS5(ctx context.Context, proxyAddr, targetAddr string) (net.Conn, error) {
+	d := &net.Dialer{Timeout: pingTimeout}
+	conn, err := d.DialContext(ctx, "tcp", proxyAddr)
+	if err != nil {
+		return nil, err
 	}
-	if p.onResult != nil {
-		p.onResult(latency, nil)
+
+	host, portStr, err := net.SplitHostPort(targetAddr)
+	if err != nil {
+		conn.Close()
+		return nil, err
 	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		conn.Close()
+		return nil, err
+	}
+
+	// Greeting: version 5, one method, no-auth
+	if _, err = conn.Write([]byte{0x05, 0x01, 0x00}); err != nil {
+		conn.Close()
+		return nil, err
+	}
+	reply := make([]byte, 2)
+	if _, err = io.ReadFull(conn, reply); err != nil {
+		conn.Close()
+		return nil, err
+	}
+	if reply[0] != 0x05 || reply[1] != 0x00 {
+		conn.Close()
+		return nil, fmt.Errorf("socks5 auth rejected")
+	}
+
+	// CONNECT request using domain-name address type
+	req := []byte{0x05, 0x01, 0x00, 0x03, byte(len(host))}
+	req = append(req, []byte(host)...)
+	req = append(req, byte(port>>8), byte(port&0xff))
+	if _, err = conn.Write(req); err != nil {
+		conn.Close()
+		return nil, err
+	}
+
+	// Read response header
+	hdr := make([]byte, 4)
+	if _, err = io.ReadFull(conn, hdr); err != nil {
+		conn.Close()
+		return nil, err
+	}
+	if hdr[1] != 0x00 {
+		conn.Close()
+		return nil, fmt.Errorf("socks5 connect refused: code %d", hdr[1])
+	}
+	// Drain the bound-address field so conn is ready for TLS
+	switch hdr[3] {
+	case 0x01: // IPv4
+		io.ReadFull(conn, make([]byte, 6))
+	case 0x03: // domain
+		buf := make([]byte, 1)
+		io.ReadFull(conn, buf)
+		io.ReadFull(conn, make([]byte, int(buf[0])+2))
+	case 0x04: // IPv6
+		io.ReadFull(conn, make([]byte, 18))
+	}
+
+	return conn, nil
 }

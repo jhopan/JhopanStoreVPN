@@ -109,7 +109,7 @@ func (t *TunDevice) Start() error {
 	args := []string{
 		"-device", fmt.Sprintf("tun://%s", t.Name),
 		"-proxy", fmt.Sprintf("socks5://%s", t.socksAddr),
-		"-loglevel", "info",
+		"-loglevel", "silent",
 	}
 
 	t.cmd = exec.Command(tun2socksPath, args...)
