@@ -91,11 +91,6 @@ func GenerateConfig(vc vless.Config, dns1, dns2 string, allowInsecure bool) ([]b
 				"protocol": "freedom",
 				"settings": map[string]interface{}{},
 			},
-			{
-				"tag":      "block",
-				"protocol": "blackhole",
-				"settings": map[string]interface{}{},
-			},
 		},
 		"routing": map[string]interface{}{
 			"domainStrategy": "AsIs",

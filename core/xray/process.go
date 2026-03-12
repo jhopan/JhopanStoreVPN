@@ -46,44 +46,33 @@ func (p *Process) Start(configJSON []byte) error {
 	}
 	configPath := filepath.Join(configDir, "config.json")
 	if err := os.WriteFile(configPath, configJSON, 0644); err != nil {
+		os.RemoveAll(configDir)
 		return fmt.Errorf("failed to write config: %w", err)
 	}
 
 	// Find xray binary
 	xrayBin := findXrayBinary()
 	if xrayBin == "" {
-		return fmt.Errorf("xray binary not found. Place xray/xray.exe next to the application")
-	}
-
-	// Create log file for xray output (next to executable or cwd)
-	logPath := filepath.Join(filepath.Dir(configPath), "xray.log")
-	logFile, err := os.Create(logPath)
-	if err != nil {
-		logFile = nil
+		os.RemoveAll(configDir)
+		return fmt.Errorf("xray binary not found. Place xray binary next to the application")
 	}
 
 	p.cmd = exec.Command(xrayBin, "run", "-c", configPath)
 	setProcAttr(p.cmd)
-	if logFile != nil {
-		p.cmd.Stdout = logFile
-		p.cmd.Stderr = logFile
-	}
+	// loglevel is "none" in config — discard any stray output
+	p.cmd.Stdout = nil
+	p.cmd.Stderr = nil
 
 	if err := p.cmd.Start(); err != nil {
-		if logFile != nil {
-			logFile.Close()
-		}
+		os.RemoveAll(configDir)
 		return fmt.Errorf("failed to start xray: %w", err)
 	}
 
 	p.running = true
 
-	// Monitor process in background
+	// Monitor process in background; cleans up configDir when xray exits
 	go func() {
-		err := p.cmd.Wait()
-		if logFile != nil {
-			logFile.Close()
-		}
+		p.cmd.Wait() //nolint:errcheck
 		p.mu.Lock()
 		wasRunning := p.running
 		p.running = false
@@ -92,8 +81,8 @@ func (p *Process) Start(configJSON []byte) error {
 		// Clean up temp config
 		os.RemoveAll(configDir)
 
-		// If it was supposed to be running (crash), invoke callback
-		if wasRunning && err != nil && p.onCrash != nil {
+		// Invoke callback for any unexpected exit — clean or non-clean
+		if wasRunning && p.onCrash != nil {
 			p.onCrash()
 		}
 	}()
