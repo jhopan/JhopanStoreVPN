@@ -222,7 +222,7 @@ class JhopanVpnService : VpnService() {
                                     .addRoute("0.0.0.0", 0)
                                     .addDnsServer(lastDns1.ifBlank { "8.8.8.8" })
                                     .addDnsServer(lastDns2.ifBlank { "8.8.4.4" })
-                                    .setMtu(1500)
+                                    .setMtu(1400)
                                 builder.addDisallowedApplication(packageName)
                                 tunFd = builder.establish()
                                 if (tunFd == null) { XrayManager.stop(); continue }
@@ -288,7 +288,7 @@ class JhopanVpnService : VpnService() {
                 .addRoute("0.0.0.0", 0)
                 .addDnsServer(dns1.ifBlank { "8.8.8.8" })
                 .addDnsServer(dns2.ifBlank { "8.8.4.4" })
-                .setMtu(1500)
+                .setMtu(1400)
 
             // Exclude our own app as defense-in-depth (protectFd handles this too)
             builder.addDisallowedApplication(packageName)

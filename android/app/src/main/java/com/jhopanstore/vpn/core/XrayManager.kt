@@ -282,7 +282,7 @@ object XrayManager {
                 try {
                     Thread.sleep(3000) // initial delay — let Xray fully stabilize
                     while (!intentionalStop && LibXray.getXrayState()) {
-                        Thread.sleep(5000) // check every 5 seconds — saves CPU wake cycles
+                        Thread.sleep(10000) // check every 10 seconds — reduces CPU wake cycles
                     }
                     if (!intentionalStop) {
                         Log.w(TAG, "Xray stopped unexpectedly")

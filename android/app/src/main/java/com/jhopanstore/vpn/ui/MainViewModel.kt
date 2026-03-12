@@ -348,39 +348,44 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // --- Ping ---
+    // Fires a short burst of 3 pings right after connect, reports the best result,
+    // then stops — no background coroutine or CPU/radio wake after that.
 
     private fun startPingLoop() {
-        viewModelScope.launch {
-            while (isConnected) {
-                doPing()
-                delay(5000)
+        viewModelScope.launch(Dispatchers.IO) {
+            var best: Long = Long.MAX_VALUE
+            var gotResult = false
+            repeat(3) { attempt ->
+                if (!isConnected) return@launch
+                try {
+                    val proxy = Proxy(
+                        Proxy.Type.SOCKS,
+                        InetSocketAddress("127.0.0.1", com.jhopanstore.vpn.core.XrayManager.SOCKS_PORT)
+                    )
+                    val url = URL(pingUrl)
+                    val conn = url.openConnection(proxy) as HttpURLConnection
+                    conn.connectTimeout = 5000
+                    conn.readTimeout = 5000
+                    conn.requestMethod = "HEAD"
+
+                    val start = System.currentTimeMillis()
+                    conn.connect()
+                    val code = conn.responseCode
+                    val elapsed = System.currentTimeMillis() - start
+                    conn.disconnect()
+
+                    if (code in 200..399 && elapsed < best) {
+                        best = elapsed
+                        gotResult = true
+                        pingResult = "$elapsed ms"
+                    }
+                } catch (_: Exception) {
+                    // ignore individual ping failure; report timeout only if all three fail
+                }
+                if (attempt < 2) delay(800)
             }
-        }
-    }
-
-    private suspend fun doPing() {
-        withContext(Dispatchers.IO) {
-            try {
-                val proxy = Proxy(
-                    Proxy.Type.SOCKS,
-                    InetSocketAddress("127.0.0.1", com.jhopanstore.vpn.core.XrayManager.SOCKS_PORT)
-                )
-                val url = URL(pingUrl)
-                val conn = url.openConnection(proxy) as HttpURLConnection
-                conn.connectTimeout = 5000
-                conn.readTimeout = 5000
-                conn.requestMethod = "HEAD"
-
-                val start = System.currentTimeMillis()
-                conn.connect()
-                val code = conn.responseCode
-                val elapsed = System.currentTimeMillis() - start
-                conn.disconnect()
-
-                pingResult = if (code in 200..399) "${elapsed} ms" else "Error $code"
-            } catch (_: Exception) {
-                pingResult = "Timeout"
-            }
+            if (!gotResult) pingResult = "Timeout"
+            // Burst complete — no further background work
         }
     }
 }

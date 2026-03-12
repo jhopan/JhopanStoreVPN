@@ -64,7 +64,7 @@ object Tun2socksManager {
                 bin.absolutePath,
                 "-device", "fd://$tunFd",
                 "-proxy", "socks5://127.0.0.1:$socksPort",
-                "-loglevel", "warn"
+                "-loglevel", "silent"
             )
             Log.i(TAG, "Starting tun2socks: ${cmd.joinToString(" ")}")
 
