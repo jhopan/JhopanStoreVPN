@@ -54,8 +54,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     var isConnecting by mutableStateOf(false)
     var statusText by mutableStateOf("Disconnected")
     var pingResult by mutableStateOf("-")
-    var showSettings by mutableStateOf(false)
-    
+
     // Flag untuk menandai sedang restart VPN (jangan reset proxy state)
     private var isRestarting = false
 
@@ -116,7 +115,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // Hotspot sharing state
-    var showHotspot by mutableStateOf(false)
     var isHotspotDetected by mutableStateOf(false)
     var hotspotIp by mutableStateOf("")
     var isProxySharingActive by mutableStateOf(false)

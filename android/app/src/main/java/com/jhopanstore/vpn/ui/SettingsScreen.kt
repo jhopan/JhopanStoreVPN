@@ -96,7 +96,11 @@ fun SettingsScreen(
                 onValueChange = { viewModel.dns1 = it },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                enabled = !viewModel.isConnected
+                enabled = !viewModel.isConnected,
+                isError = viewModel.dns1.isNotBlank() && !isValidIpOrEmpty(viewModel.dns1),
+                supportingText = if (viewModel.dns1.isNotBlank() && !isValidIpOrEmpty(viewModel.dns1)) {
+                    { Text("Format tidak valid (contoh: 8.8.8.8)", color = MaterialTheme.colorScheme.error, fontSize = 11.sp) }
+                } else null
             )
         }
 
@@ -106,7 +110,11 @@ fun SettingsScreen(
                 onValueChange = { viewModel.dns2 = it },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                enabled = !viewModel.isConnected
+                enabled = !viewModel.isConnected,
+                isError = viewModel.dns2.isNotBlank() && !isValidIpOrEmpty(viewModel.dns2),
+                supportingText = if (viewModel.dns2.isNotBlank() && !isValidIpOrEmpty(viewModel.dns2)) {
+                    { Text("Format tidak valid (contoh: 8.8.4.4)", color = MaterialTheme.colorScheme.error, fontSize = 11.sp) }
+                } else null
             )
         }
 
@@ -162,6 +170,14 @@ fun SettingsScreen(
 }
 
 // ── Helpers ──────────────────────────────────────────────────────
+
+/** Returns true for blank (use default) or valid dotted-decimal IPv4 address. */
+private fun isValidIpOrEmpty(ip: String): Boolean {
+    if (ip.isBlank()) return true
+    val parts = ip.trim().split(".")
+    if (parts.size != 4) return false
+    return parts.all { part -> part.toIntOrNull()?.let { it in 0..255 } ?: false }
+}
 
 @Composable
 private fun SectionHeader(title: String) {

@@ -155,10 +155,10 @@ fun HotspotScreen(
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
                             ProxyInfoRow(label = "Host", value = viewModel.hotspotIp)
+                            Spacer(Modifier.height(8.dp))
+                            ProxyInfoRow(label = "SOCKS5 Port", value = "10808")
                             Spacer(Modifier.height(4.dp))
-                            ProxyInfoRow(label = "Port", value = "10809")
-                            Spacer(Modifier.height(4.dp))
-                            ProxyInfoRow(label = "Tipe", value = "SOCKS5")
+                            ProxyInfoRow(label = "HTTP Port", value = "10809")
                         }
                     }
 
@@ -178,28 +178,28 @@ fun HotspotScreen(
                             )
                             Spacer(Modifier.height(10.dp))
                             GuideItem(
-                                platform = "[Android]",
-                                steps = "1. Hubungkan ke hotspot HP ini\n2. Settings > WiFi > Tahan nama jaringan > Ubah jaringan\n3. Aktifkan Opsi Lanjutan > Proxy > Manual\n4. Hostname: ${viewModel.hotspotIp}\n5. Port: 10809\n6. Simpan"
+                                platform = "[Android] — HTTP Proxy (port 10809)",
+                                steps = "1. Sambungkan ke hotspot HP ini\n2. Settings > WiFi > Tahan nama jaringan > Ubah jaringan\n3. Opsi Lanjutan > Proxy > Manual\n4. Hostname: ${viewModel.hotspotIp}  Port: 10809\n5. Simpan"
                             )
                             Spacer(Modifier.height(8.dp))
                             GuideItem(
-                                platform = "[iOS]",
-                                steps = "1. Hubungkan ke hotspot HP ini\n2. Settings > Wi-Fi > tekan (i) di nama jaringan\n3. Scroll bawah > Configure Proxy > Manual\n4. Server: ${viewModel.hotspotIp}\n5. Port: 10809\n6. Tap Save"
+                                platform = "[iOS] — HTTP Proxy (port 10809)",
+                                steps = "1. Sambungkan ke hotspot HP ini\n2. Settings > Wi-Fi > tekan (i) di jaringan\n3. Configure Proxy > Manual\n4. Server: ${viewModel.hotspotIp}  Port: 10809\n5. Save"
                             )
                             Spacer(Modifier.height(8.dp))
                             GuideItem(
-                                platform = "[Windows]",
-                                steps = "Settings > Network & Internet > Proxy > Manual proxy setup > On > Address: ${viewModel.hotspotIp}, Port: 10809"
+                                platform = "[Windows] — Pilih salah satu:",
+                                steps = "\u2022 HTTP: Settings > Network > Proxy > Manual\n  Address: ${viewModel.hotspotIp}  Port: 10809\n\u2022 SOCKS5: Proxifier / SocksCap\n  ${viewModel.hotspotIp}:10808"
                             )
                             Spacer(Modifier.height(8.dp))
                             GuideItem(
-                                platform = "[Linux]",
-                                steps = "Settings > Network > Network Proxy > Manual > Socks Host: ${viewModel.hotspotIp}, Port: 10809"
+                                platform = "[Linux] — Pilih salah satu:",
+                                steps = "\u2022 HTTP: Settings > Network > Proxy > Manual\n  HTTP Proxy: ${viewModel.hotspotIp}:10809\n\u2022 SOCKS5 (terminal):\n  export all_proxy=socks5://${viewModel.hotspotIp}:10808"
                             )
                             Spacer(Modifier.height(8.dp))
                             GuideItem(
-                                platform = "[macOS]",
-                                steps = "System Settings > Network > [Nama WiFi] > Details > Proxies > HTTP Proxy > ${viewModel.hotspotIp}:10809"
+                                platform = "[macOS] — Pilih salah satu:",
+                                steps = "\u2022 HTTP: System Settings > Network > [WiFi]\n  Details > Proxies > Web Proxy (HTTP): ${viewModel.hotspotIp}:10809\n\u2022 SOCKS5: Details > Proxies > SOCKS Proxy:\n  ${viewModel.hotspotIp}:10808"
                             )
                         }
                     }
@@ -229,7 +229,7 @@ private fun StepLabel(number: String, done: Boolean) {
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Text(
-                    text = if (done) "v" else number,
+                    text = if (done) "\u2713" else number,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White

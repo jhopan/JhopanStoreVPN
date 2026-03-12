@@ -167,6 +167,7 @@ class JhopanVpnService : VpnService() {
             lastVlessUri = vlessUri
             lastDns1 = dns1
             lastDns2 = dns2
+            reconnectAttempts = 0
 
             if (isStopping) return
 
@@ -196,7 +197,7 @@ class JhopanVpnService : VpnService() {
                             var success = false
                             while (autoReconnect && reconnectAttempts < MAX_RECONNECT_ATTEMPTS && !success) {
                                 reconnectAttempts++
-                                val delay = 3000L * reconnectAttempts
+                                val delay = minOf(3000L shl (reconnectAttempts - 1), 60_000L)
                                 Log.w(TAG, "Xray died, reconnecting in ${delay}ms (attempt $reconnectAttempts)")
                                 updateNotification("Reconnecting ($reconnectAttempts)...")
                                 Thread.sleep(delay)
@@ -276,7 +277,7 @@ class JhopanVpnService : VpnService() {
                 if (!started) {
                     if (autoReconnect && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
                         reconnectAttempts++
-                        val delay = 3000L * reconnectAttempts
+                        val delay = minOf(3000L shl (reconnectAttempts - 1), 60_000L)
                         Log.w(TAG, "Retrying Xray start in ${delay}ms (attempt $reconnectAttempts)")
                         updateNotification("Retry ($reconnectAttempts)...")
                         Thread.sleep(delay)

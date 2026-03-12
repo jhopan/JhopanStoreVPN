@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WifiTethering
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -30,11 +31,13 @@ fun MainScreen(
     onConnect: () -> Unit,
     onDisconnect: () -> Unit,
     onImportClipboard: () -> Unit,
-    onOpenHotspotSettings: () -> Unit,
     onToggleProxy: () -> Unit,
     onCopyProxy: () -> Unit,
-    onOpenBatterySettings: () -> Unit
+    onOpenBatterySettings: () -> Unit,
+    onDismissBatteryBanner: () -> Unit
 ) {
+    var showSettings by rememberSaveable { mutableStateOf(false) }
+    var showHotspot by rememberSaveable { mutableStateOf(false) }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -46,7 +49,7 @@ fun MainScreen(
                     ) {
                         Icon(Icons.Default.ContentPaste, contentDescription = "Paste")
                     }
-                    IconButton(onClick = { viewModel.showHotspot = !viewModel.showHotspot; viewModel.showSettings = false }) {
+                    IconButton(onClick = { showHotspot = !showHotspot; showSettings = false }) {
                         Icon(
                             Icons.Default.WifiTethering,
                             contentDescription = "Bagikan VPN",
@@ -54,7 +57,7 @@ fun MainScreen(
                                    else LocalContentColor.current
                         )
                     }
-                    IconButton(onClick = { viewModel.showSettings = !viewModel.showSettings; viewModel.showHotspot = false }) {
+                    IconButton(onClick = { showSettings = !showSettings; showHotspot = false }) {
                         Icon(Icons.Default.Settings, contentDescription = "Settings")
                     }
                 },
@@ -67,16 +70,16 @@ fun MainScreen(
         }
     ) { padding ->
         when {
-            viewModel.showHotspot -> HotspotScreen(
+            showHotspot -> HotspotScreen(
                 viewModel = viewModel,
-                onClose = { viewModel.showHotspot = false },
+                onClose = { showHotspot = false },
                 onToggleProxy = onToggleProxy,
                 onCheckHotspot = { viewModel.checkHotspot() },
                 modifier = Modifier.padding(padding)
             )
-            viewModel.showSettings -> SettingsScreen(
+            showSettings -> SettingsScreen(
                 viewModel = viewModel,
-                onClose = { viewModel.showSettings = false },
+                onClose = { showSettings = false },
                 modifier = Modifier.padding(padding)
             )
             else -> MainContent(
@@ -85,6 +88,7 @@ fun MainScreen(
                 onDisconnect = onDisconnect,
                 onCopyProxy = onCopyProxy,
                 onOpenBatterySettings = onOpenBatterySettings,
+                onDismissBatteryBanner = onDismissBatteryBanner,
                 modifier = Modifier.padding(padding)
             )
         }
@@ -98,6 +102,7 @@ private fun MainContent(
     onDisconnect: () -> Unit,
     onCopyProxy: () -> Unit,
     onOpenBatterySettings: () -> Unit,
+    onDismissBatteryBanner: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -141,7 +146,7 @@ private fun MainContent(
                         Text("Perbaiki", fontSize = 12.sp, color = Color(0xFFF57C00))
                     }
                     TextButton(
-                        onClick = { viewModel.isBatteryOptimized = false },
+                        onClick = onDismissBatteryBanner,
                         contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
                     ) {
                         Text("×", fontSize = 16.sp, color = Color(0xFF999999))
@@ -283,7 +288,7 @@ private fun MainContent(
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        text = "Proxy: ${viewModel.hotspotIp}:10809",
+                        text = "${viewModel.hotspotIp}  SOCKS5:10808 / HTTP:10809",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Medium,
                         modifier = Modifier.weight(1f)

@@ -81,6 +81,12 @@ object VlessParser {
                 }
             }
 
+            // Validate UUID format: 8-4-4-4-12 hex chars
+            val uuidRegex = Regex("""^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$""")
+            if (!uuidRegex.matches(uuid)) {
+                return Result.failure(IllegalArgumentException("UUID tidak valid: format yang benar xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"))
+            }
+
             val config = VlessConfig(
                 address = address,
                 port = port,

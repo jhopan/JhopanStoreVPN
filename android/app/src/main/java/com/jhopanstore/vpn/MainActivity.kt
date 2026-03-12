@@ -115,7 +115,6 @@ class MainActivity : ComponentActivity() {
                     onConnect = { requestVpnPermission(vm) },
                     onDisconnect = { disconnectVpn(vm) },
                     onImportClipboard = { importFromClipboard(vm) },
-                    onOpenHotspotSettings = { openHotspotSettings() },
                     onToggleProxy = { vm.toggleProxySharing(this@MainActivity) },
                     onCopyProxy = { copyProxyToClipboard(vm) },
                     onOpenBatterySettings = {
@@ -124,7 +123,8 @@ class MainActivity : ComponentActivity() {
                                 data = Uri.parse("package:$packageName")
                             }
                         )
-                    }
+                    },
+                    onDismissBatteryBanner = { dismissBatteryBanner() }
                 )
             }
         }
@@ -136,9 +136,17 @@ class MainActivity : ComponentActivity() {
         pendingViewModel?.syncConnectionState()
         val pm = getSystemService(POWER_SERVICE) as PowerManager
         val isIgnoring = pm.isIgnoringBatteryOptimizations(packageName)
-        // Tampilkan warning banner hanya jika belum dibebaskan dari optimasi baterai
-        // User bisa dismiss per-sesi dengan tombol ×
-        pendingViewModel?.isBatteryOptimized = !isIgnoring
+        if (isIgnoring) {
+            // Battery opt dinonaktifkan — clear suppression agar banner muncul kembali
+            // jika user mengaktifkan battery opt lagi di masa depan
+            getSharedPreferences("app_prefs", MODE_PRIVATE).edit()
+                .remove("battery_banner_dismissed").apply()
+            pendingViewModel?.isBatteryOptimized = false
+        } else {
+            val dismissed = getSharedPreferences("app_prefs", MODE_PRIVATE)
+                .getBoolean("battery_banner_dismissed", false)
+            pendingViewModel?.isBatteryOptimized = !dismissed
+        }
         requestNotificationPermission()
     }
 
@@ -198,15 +206,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun openHotspotSettings() {
-        try {
-            // Buka langsung halaman tethering/hotspot
-            val intent = Intent(Settings.ACTION_WIRELESS_SETTINGS)
-            startActivity(intent)
-        } catch (e: Exception) {
-            // Fallback ke settings utama
-            startActivity(Intent(Settings.ACTION_SETTINGS))
-        }
+    private fun dismissBatteryBanner() {
+        pendingViewModel?.isBatteryOptimized = false
+        getSharedPreferences("app_prefs", MODE_PRIVATE).edit()
+            .putBoolean("battery_banner_dismissed", true)
+            .apply()
     }
 
     private fun copyProxyToClipboard(vm: MainViewModel) {
