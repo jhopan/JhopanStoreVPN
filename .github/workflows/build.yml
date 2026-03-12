@@ -222,7 +222,7 @@ jobs:
         run: |
           # Ensure Xcode command line tools are available
           xcode-select --install 2>/dev/null || echo "Xcode tools already installed"
-          
+
       - name: Download tun2socks binary
         run: |
           curl -L -o tun2socks.zip "https://github.com/xjasonlyu/tun2socks/releases/download/v2.5.2/tun2socks-darwin-amd64.zip"
@@ -281,9 +281,9 @@ jobs:
             <key>CFBundleDisplayName</key>
             <string>JhopanStoreVPN</string>
             <key>CFBundleVersion</key>
-            <string>2.0.0</string>
+            <string>2.1.0</string>
             <key>CFBundleShortVersionString</key>
-            <string>2.0.0</string>
+            <string>2.1.0</string>
             <key>CFBundlePackageType</key>
             <string>APPL</string>
             <key>LSMinimumSystemVersion</key>

@@ -441,7 +441,7 @@ func main() {
 		doDisconnect()
 	})
 
-	_ = widget.NewLabel("v1.0.0")
+	_ = widget.NewLabel("v2.1.0")
 
 	w.ShowAndRun()
 
