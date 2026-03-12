@@ -213,7 +213,15 @@ class JhopanVpnService : VpnService() {
                                 val xrayStarted = XrayManager.start(this, parsedCfg, lastDns1, lastDns2, resolvedIp)
                                 if (!xrayStarted) continue
 
-                                Thread.sleep(1000)
+                                // Probe SOCKS5 port — proceed as soon as ready, max 5s
+                                var portUp = false
+                                for (probe in 0 until 20) {
+                                    try {
+                                        java.net.Socket("127.0.0.1", XrayManager.SOCKS_PORT).use { portUp = true; break }
+                                    } catch (_: Exception) {}
+                                    Thread.sleep(250)
+                                }
+                                if (!portUp) { XrayManager.stop(); continue }
 
                                 // Re-establish TUN
                                 val builder = Builder()
@@ -278,8 +286,24 @@ class JhopanVpnService : VpnService() {
                 return
             }
 
-            // Wait for Xray SOCKS proxy to be ready
-            Thread.sleep(1000)
+            // Probe SOCKS5 port until ready — max 10s (typically ready in 200-500ms)
+            updateNotification("Waiting for Xray...")
+            var portReady = false
+            for (probe in 0 until 40) {
+                if (isStopping) { XrayManager.stop(); return }
+                try {
+                    java.net.Socket("127.0.0.1", XrayManager.SOCKS_PORT).use { portReady = true; break }
+                } catch (_: Exception) {}
+                Thread.sleep(250)
+            }
+            if (!portReady) {
+                Log.e(TAG, "Xray SOCKS5 port not ready after 10s")
+                XrayManager.stop()
+                _state.value = VpnState.FAILED
+                updateNotification("Xray timeout")
+                stopSelf()
+                return
+            }
 
             // Establish TUN interface
             val builder = Builder()

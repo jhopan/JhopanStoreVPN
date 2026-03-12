@@ -94,6 +94,16 @@ object XrayManager {
 
         root.put("log", JSONObject().apply { put("loglevel", "none") })
 
+        // Disable per-connection stats tracking — saves CPU on every packet
+        root.put("policy", JSONObject().apply {
+            put("system", JSONObject().apply {
+                put("statsInboundUplink", false)
+                put("statsInboundDownlink", false)
+                put("statsOutboundUplink", false)
+                put("statsOutboundDownlink", false)
+            })
+        })
+
         // -- inbounds --
         root.put("inbounds", JSONArray().apply {
             // SOCKS5 inbound (for tun2socks and advanced usage)
@@ -135,6 +145,8 @@ object XrayManager {
             put("security", cfg.security)
             put("wsSettings", wsSettings)
             if (cfg.security == "tls") put("tlsSettings", tlsSettings)
+            // Enable TCP Fast Open — reduces 1 RTT on reconnection (available Android API 21+)
+            put("sockopt", JSONObject().apply { put("tcpFastOpen", true) })
         }
 
         val serverAddress = resolvedIp ?: cfg.address
@@ -159,7 +171,11 @@ object XrayManager {
                 })
                 put("streamSettings", streamSettings)
             })
-            put(JSONObject().apply { put("tag", "direct"); put("protocol", "freedom") })
+            put(JSONObject().apply {
+                put("tag", "direct")
+                put("protocol", "freedom")
+                put("settings", JSONObject().apply { put("domainStrategy", "UseIPv4") })
+            })
             put(JSONObject().apply { put("tag", "block"); put("protocol", "blackhole") })
             if (cloudflare) {
                 put(JSONObject().apply { put("tag", "dns-out"); put("protocol", "dns") })
@@ -252,16 +268,6 @@ object XrayManager {
 
             // Generate Xray config JSON
             val configJson = buildConfig(cfg, dns1, dns2, resolvedIp)
-            Log.d(TAG, "Config content:\n$configJson")
-
-            // Log libXray version
-            try {
-                val verResponse = LibXray.xrayVersion()
-                val (_, version) = parseResponse(verResponse)
-                Log.i(TAG, "libXray Xray-core version: $version")
-            } catch (e: Exception) {
-                Log.w(TAG, "Could not get Xray version: ${e.message}")
-            }
 
             // Create base64-encoded request using libXray's factory method
             val requestBase64 = LibXray.newXrayRunFromJSONRequest(datDir, mphCachePath, configJson)
