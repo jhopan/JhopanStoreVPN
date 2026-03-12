@@ -67,12 +67,14 @@ jobs:
 
   build-windows:
     needs: changes
-    # Tag push → cek path | manual dispatch → ikut checkbox
+    # Tag push → selalu build semua platform | manual → checkbox | branch push → path filter
     if: |
-      (startsWith(github.ref, 'refs/tags/') && needs.changes.outputs.desktop == 'true') ||
+      startsWith(github.ref, 'refs/tags/') ||
       (github.event_name == 'workflow_dispatch' && inputs.build_windows == true) ||
       (github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/') && needs.changes.outputs.desktop == 'true')
     runs-on: windows-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -128,13 +130,22 @@ jobs:
           name: JhopanStoreVPN-windows
           path: release/JhopanStoreVPN-windows.zip
 
+      - name: Upload to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/JhopanStoreVPN-windows.zip
+          fail_on_unmatched_files: false
+
   build-linux:
     needs: changes
     if: |
-      (startsWith(github.ref, 'refs/tags/') && needs.changes.outputs.desktop == 'true') ||
+      startsWith(github.ref, 'refs/tags/') ||
       (github.event_name == 'workflow_dispatch' && inputs.build_linux == true) ||
       (github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/') && needs.changes.outputs.desktop == 'true')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -203,11 +214,22 @@ jobs:
           name: JhopanStoreVPN-linux
           path: release/JhopanStoreVPN-linux.tar.gz
 
+      - name: Upload to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/JhopanStoreVPN-linux.tar.gz
+          fail_on_unmatched_files: false
+
   build-macos:
     needs: changes
     if: |
-      (startsWith(github.ref, 'refs/tags/') && needs.changes.outputs.desktop == 'true') ||
+      startsWith(github.ref, 'refs/tags/') ||
       (github.event_name == 'workflow_dispatch' && inputs.build_macos == true) ||
+      (github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/') && needs.changes.outputs.desktop == 'true')
+    runs-on: macos-latest
+    permissions:
+      contents: write
       (github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/') && needs.changes.outputs.desktop == 'true')
     runs-on: macos-latest
     steps:
@@ -303,13 +325,22 @@ jobs:
           name: JhopanStoreVPN-macos
           path: release/JhopanStoreVPN-macos.tar.gz
 
+      - name: Upload to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/JhopanStoreVPN-macos.tar.gz
+          fail_on_unmatched_files: false
+
   build-android:
     needs: changes
     if: |
-      (startsWith(github.ref, 'refs/tags/') && needs.changes.outputs.android == 'true') ||
+      startsWith(github.ref, 'refs/tags/') ||
       (github.event_name == 'workflow_dispatch' && inputs.build_android == true) ||
       (github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/') && needs.changes.outputs.android == 'true')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -405,48 +436,23 @@ jobs:
           name: JhopanStoreVPN-android
           path: JhopanStoreVPN-android.apk
 
+      - name: Upload to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: JhopanStoreVPN-android.apk
+          fail_on_unmatched_files: false
+
   release:
     needs: [build-windows, build-linux, build-macos, build-android]
     runs-on: ubuntu-latest
-    # Jalankan jika push tag dan tidak ada job yang failure (job yang di-skip = OK)
-    if: always() && startsWith(github.ref, 'refs/tags/') && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    # Jalankan selalu saat tag push — rilis apa pun yang berhasil, skip yang gagal tidak masalah
+    if: always() && startsWith(github.ref, 'refs/tags/')
     permissions:
       contents: write
     steps:
-      - name: Download Windows artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: JhopanStoreVPN-windows
-          path: artifacts/JhopanStoreVPN-windows
-        continue-on-error: true
-
-      - name: Download Linux artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: JhopanStoreVPN-linux
-          path: artifacts/JhopanStoreVPN-linux
-        continue-on-error: true
-
-      - name: Download macOS artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: JhopanStoreVPN-macos
-          path: artifacts/JhopanStoreVPN-macos
-        continue-on-error: true
-
-      - name: Download Android artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: JhopanStoreVPN-android
-          path: artifacts/JhopanStoreVPN-android
-        continue-on-error: true
-
-      - name: Create GitHub Release
+      - name: Create / update GitHub Release with release notes
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            artifacts/JhopanStoreVPN-windows/*.zip
-            artifacts/JhopanStoreVPN-linux/*.tar.gz
-            artifacts/JhopanStoreVPN-macos/*.tar.gz
-            artifacts/JhopanStoreVPN-android/*.apk
           generate_release_notes: true
+          fail_on_unmatched_files: false
