@@ -19,16 +19,16 @@
 
 #### Ronde 2 — Desktop Deep Optimization (Win/Linux/macOS)
 
-| #   | File                      | Perubahan                                                                                   | Dampak                                                             |
-| --- | ------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| 5   | `core/xray/process.go`    | Hapus pembuatan log file (loglevel none → output discarded), fix cleanup temp dir semua error path | Tidak ada file xray.log kosong tiap connect, tidak ada leak dir |
-| 6   | `core/xray/process.go`    | `onCrash` trigger untuk semua exit (hapus syarat `err != nil`)                              | Deteksi crash termasuk xray exit code 0                            |
-| 7   | `core/tun/tun.go`         | `time.Sleep(1s)` → `select { processDone / time.After(1s) }` (deteksi crash dini)          | Koneksi gagal terdeteksi segera, bukan setelah 1 s penuh          |
-| 8   | `core/tun/tun.go`         | Hapus `time.Sleep(500ms)` di `Close()`                                                      | Disconnect lebih cepat 500 ms                                       |
-| 9   | `core/tun/tun.go`         | Tambah `-tcp-no-delay` dan `-udp-timeout 30s` ke args tun2socks (setara Android)            | Latensi TCP lebih rendah, UDP memory free lebih cepat              |
-| 10  | `core/tun/tun.go`         | Binary detection: `tun2socks.exe` hardcode → `runtime.GOOS`-aware (Win/Linux/macOS)        | Bisa build & run di Linux dan macOS tanpa modifikasi              |
-| 11  | `main.go`                 | Hapus auto-reconnect ticker 10 s (redundant — `onCrash` di process.go sudah handle ini)    | Hilangkan 1 goroutine background saat connected                    |
-| 12  | `core/xray/config.go`     | Hapus outbound `block` (blackhole) yang tidak direferensikan di routing                     | Config lebih bersih, Xray tidak allocate handler unused            |
+| #   | File                   | Perubahan                                                                                          | Dampak                                                          |
+| --- | ---------------------- | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| 5   | `core/xray/process.go` | Hapus pembuatan log file (loglevel none → output discarded), fix cleanup temp dir semua error path | Tidak ada file xray.log kosong tiap connect, tidak ada leak dir |
+| 6   | `core/xray/process.go` | `onCrash` trigger untuk semua exit (hapus syarat `err != nil`)                                     | Deteksi crash termasuk xray exit code 0                         |
+| 7   | `core/tun/tun.go`      | `time.Sleep(1s)` → `select { processDone / time.After(1s) }` (deteksi crash dini)                  | Koneksi gagal terdeteksi segera, bukan setelah 1 s penuh        |
+| 8   | `core/tun/tun.go`      | Hapus `time.Sleep(500ms)` di `Close()`                                                             | Disconnect lebih cepat 500 ms                                   |
+| 9   | `core/tun/tun.go`      | Tambah `-tcp-no-delay` dan `-udp-timeout 30s` ke args tun2socks (setara Android)                   | Latensi TCP lebih rendah, UDP memory free lebih cepat           |
+| 10  | `core/tun/tun.go`      | Binary detection: `tun2socks.exe` hardcode → `runtime.GOOS`-aware (Win/Linux/macOS)                | Bisa build & run di Linux dan macOS tanpa modifikasi            |
+| 11  | `main.go`              | Hapus auto-reconnect ticker 10 s (redundant — `onCrash` di process.go sudah handle ini)            | Hilangkan 1 goroutine background saat connected                 |
+| 12  | `core/xray/config.go`  | Hapus outbound `block` (blackhole) yang tidak direferensikan di routing                            | Config lebih bersih, Xray tidak allocate handler unused         |
 
 ### Android (`optimation` branch — Kotlin + libXray in-process)
 
@@ -356,7 +356,7 @@ app/build/outputs/apk/release/
 
 ## Status Branch
 
-| Branch       | Isi                                                                          |
-| ------------ | ---------------------------------------------------------------------------- |
-| `main`       | Desktop optimizations selesai, pushed                                        |
-| `optimation` | Semua Android optimizations (5 ronde) + Desktop Round 2 (8 fix), pushed     |
+| Branch       | Isi                                                                     |
+| ------------ | ----------------------------------------------------------------------- |
+| `main`       | Desktop optimizations selesai, pushed                                   |
+| `optimation` | Semua Android optimizations (5 ronde) + Desktop Round 2 (8 fix), pushed |

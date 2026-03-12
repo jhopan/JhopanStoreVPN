@@ -47,6 +47,7 @@
 ### 🖥️ Desktop (Windows / Linux / macOS)
 
 #### Core VPN Features
+
 - ✅ **TUN Mode** - Virtual network interface for true system-wide routing
 - ✅ **All Apps Work** - WhatsApp Desktop, Telegram, Discord, Steam, Epic Games, etc.
 - ✅ **VLESS Protocol** - WebSocket + TLS via Xray-core
@@ -55,6 +56,7 @@
 - ✅ **Smart Routing Cleanup** - Internet automatically restored on disconnect
 
 #### UI & Usability
+
 - ✅ **Modern GUI** - Clean interface powered by Fyne v2
 - ✅ **System Tray** - Minimize to tray, stays in background
 - ✅ **Single Instance** - Prevents duplicate processes (mutex/lock)
@@ -66,6 +68,7 @@
 ### 📱 Android (APK)
 
 #### Core VPN Features
+
 - ✅ **VpnService API** - True system-wide VPN (no root required)
 - ✅ **VLESS via libXray** - Native performance with Xray-core AAR
 - ✅ **Hotspot Sharing** - Share VPN with other devices (HTTP proxy port 10809)
@@ -73,6 +76,7 @@
 - ✅ **Config Persistence** - Settings automatically saved
 
 #### UI & Stats
+
 - ✅ **Material Design 3** - Modern Android UI with Jetpack Compose
 - ✅ **Real-Time Statistics** - Upload/download speed, traffic counter
 - ✅ **QR Code Import** - Scan config from QR codes
@@ -92,19 +96,20 @@ Go to [**Releases Page**](https://github.com/jhopan/JhopanStoreVPN/releases/late
 
 ### 🖥️ Desktop
 
-| Platform | File | Size | Requirements |
-|----------|------|------|--------------|
-| **Windows 10/11** | `JhopanStoreVPN-windows.zip` | ~42 MB | Administrator privileges |
-| **Linux (x64)** | `JhopanStoreVPN-linux.tar.gz` | ~38 MB | Root/sudo access |
-| **macOS (ARM64)** | `JhopanStoreVPN-macos.tar.gz` | ~39 MB | macOS 11+ |
+| Platform          | File                          | Size   | Requirements             |
+| ----------------- | ----------------------------- | ------ | ------------------------ |
+| **Windows 10/11** | `JhopanStoreVPN-windows.zip`  | ~42 MB | Administrator privileges |
+| **Linux (x64)**   | `JhopanStoreVPN-linux.tar.gz` | ~38 MB | Root/sudo access         |
+| **macOS (ARM64)** | `JhopanStoreVPN-macos.tar.gz` | ~39 MB | macOS 11+                |
 
 ### 📱 Android
 
-| File | Size | Requirements |
-|------|------|--------------|
+| File                 | Size   | Requirements          |
+| -------------------- | ------ | --------------------- |
 | `JhopanStoreVPN.apk` | ~30 MB | Android 7.0+ (API 24) |
 
 > **⚠️ Important Notes:**
+>
 > - **Desktop**: TUN mode requires **administrator/root privileges** to create virtual network interfaces
 > - **Windows**: UAC prompt will appear automatically on startup
 > - **Linux/macOS**: Run with `sudo` or configure passwordless sudo for convenience
@@ -117,6 +122,7 @@ Go to [**Releases Page**](https://github.com/jhopan/JhopanStoreVPN/releases/late
 ### 🖥️ Desktop Setup
 
 #### Windows
+
 ```powershell
 # 1. Extract downloaded zip
 # 2. Double-click JhopanStoreVPN.exe
@@ -128,6 +134,7 @@ Go to [**Releases Page**](https://github.com/jhopan/JhopanStoreVPN/releases/late
 **First Run**: Windows may prompt to install **Wintun driver** — click "Yes" to install.
 
 #### Linux
+
 ```bash
 # Extract archive
 tar -xzf JhopanStoreVPN-linux.tar.gz
@@ -141,6 +148,7 @@ sudo ./launch.sh
 ```
 
 #### macOS
+
 ```bash
 # Extract archive
 tar -xzf JhopanStoreVPN-macos.tar.gz
@@ -183,16 +191,19 @@ sudo ./JhopanStoreVPN.app/Contents/MacOS/JhopanStoreVPN
 ### Desktop
 
 **System Tray**
+
 - Close button (X) → Hides to tray
 - Right-click tray icon → Show window or Exit
 - Exit properly to ensure routing cleanup
 
 **Config Management**
+
 - Clipboard button: paste `vless://` links
 - Manual entry: server address, port, UUID, path
 - Settings are saved automatically
 
 **Monitoring**
+
 - Ping display shows latency in real-time
 - Green = Connected, Red = Disconnected
 - Auto-reconnect on connection loss
@@ -200,15 +211,18 @@ sudo ./JhopanStoreVPN.app/Contents/MacOS/JhopanStoreVPN
 ### Android
 
 **Battery Optimization**
+
 - Disable battery optimization for JhopanStoreVPN
 - This prevents system from killing VPN service
 - Settings → Battery → Battery Optimization → JhopanStoreVPN → Don't Optimize
 
 **Autostart Permission** (Xiaomi, Huawei, OPPO, etc.)
+
 - Some manufacturers require autostart permission
 - Settings → Apps → Autostart → Enable for JhopanStoreVPN
 
 **Split Tunneling** (Coming Soon)
+
 - Currently all apps route through VPN
 - Split tunneling feature in future release
 
@@ -297,6 +311,7 @@ cd android
 ```
 
 **Technical Details:**
+
 - **TUN Device**: Layer 3 virtual network interface created by tun2socks
 - **Routing Table**: All traffic (0.0.0.0/0) routed via TUN gateway (10.0.0.1)
 - **Platform Commands**:
@@ -335,6 +350,7 @@ cd android
 ```
 
 **Additional Features:**
+
 - **Hotspot Sharing**: HTTP proxy on port 10809 for WiFi clients
 - **Foreground Service**: Notification prevents system kill
 - **Config Storage**: Shared Preferences with encryption
@@ -352,6 +368,7 @@ cd android
 **Cause**: Application not running with administrator/root privileges.
 
 **Solution**:
+
 - **Windows**: Right-click → "Run as Administrator"
 - **Linux/macOS**: Run with `sudo ./JhopanStoreVPN`
 - **Note**: UAC manifest should trigger admin prompt automatically on Windows
@@ -364,6 +381,7 @@ cd android
 **Cause**: tun2socks binary missing from `bin/` folder.
 
 **Solution**:
+
 1. Download from [tun2socks releases](https://github.com/xjasonlyu/tun2socks/releases/tag/v2.5.2)
 2. Extract the appropriate binary:
    - Windows: `tun2socks-windows-amd64.exe` → `bin/tun2socks.exe`
@@ -379,6 +397,7 @@ cd android
 **Cause**: Wintun driver (required for TUN mode) not installed.
 
 **Solution**:
+
 - Click "Yes" or "Install" when prompted
 - This is a one-time installation
 - Driver is required for TUN interface creation
@@ -390,11 +409,13 @@ cd android
 <summary><b>"Connection successful but no internet"</b></summary>
 
 **Possible Causes**:
+
 1. Xray process not running
 2. VLESS server unreachable
 3. Routing table misconfigured
 
 **Diagnostics**:
+
 ```bash
 # Windows: Check if Xray is running
 tasklist | findstr xray
@@ -413,6 +434,7 @@ netstat -nr | grep default
 ```
 
 **Solution**:
+
 - Verify VLESS server address, port, UUID are correct
 - Check firewall isn't blocking Xray (port 10809)
 - Try disconnecting and reconnecting
@@ -426,6 +448,7 @@ netstat -nr | grep default
 **Cause**: Single instance lock prevents duplicate processes (this is intentional).
 
 **Solution**:
+
 - Check system tray for running instance
 - Right-click tray icon → Show window
 - Or properly exit via tray menu → Exit
@@ -441,6 +464,7 @@ netstat -nr | grep default
 **Cause**: Routing cleanup failed or tun2socks crashed.
 
 **Solution**:
+
 ```bash
 # Windows: Reset routing table
 route -f
@@ -465,6 +489,7 @@ sudo route flush
 **Cause**: System battery optimization or aggressive task killer.
 
 **Solution**:
+
 1. **Disable Battery Optimization**:
    - Settings → Battery → Battery Optimization
    - Find JhopanStoreVPN → Don't Optimize
@@ -487,6 +512,7 @@ sudo route flush
 **Cause**: Port 10809 blocked or hotspot restrictions.
 
 **Solution**:
+
 1. Ensure "Enable Hotspot Sharing" is toggled ON in settings
 2. Check firewall isn't blocking port 10809
 3. Test from client device:
@@ -504,6 +530,7 @@ sudo route flush
 <summary><b>"Unable to install APK" or "App not installed"</b></summary>
 
 **Solution**:
+
 1. Enable "Install from Unknown Sources":
    - Settings → Security → Unknown Sources (Android 7-9)
    - Settings → Apps → Special Access → Install Unknown Apps → Chrome/File Manager (Android 10+)
@@ -511,6 +538,7 @@ sudo route flush
 2. Check storage space (needs ~50 MB free)
 
 3. Uninstall old version first if upgrading:
+
    ```bash
    adb uninstall com.jhopanstore.vpn
    ```
@@ -523,6 +551,7 @@ sudo route flush
 <summary><b>"Connection failed" or "Server unreachable"</b></summary>
 
 **Diagnostics**:
+
 1. Verify VLESS config: server address, port, UUID, path
 2. Test server reachability from browser
 3. Check server logs for connection attempts
@@ -541,6 +570,7 @@ sudo route flush
 TUN mode creates virtual network interfaces and modifies system routing tables. These are privileged operations that require elevated permissions.
 
 **Alternatives without admin**:
+
 - Proxy mode (not implemented, TUN-only by design)
 - Browser extensions (limited to browser only)
 
@@ -550,6 +580,7 @@ TUN mode creates virtual network interfaces and modifies system routing tables. 
 <summary><b>Is my traffic encrypted?</b></summary>
 
 Yes! All traffic is encrypted using:
+
 - **VLESS protocol** with TLS (Transport Layer Security)
 - **WebSocket** over TLS for additional obfuscation
 - End-to-end encryption between client and VLESS server
@@ -560,12 +591,14 @@ Yes! All traffic is encrypted using:
 <summary><b>Does JhopanStoreVPN log any data?</b></summary>
 
 No. The application does not log:
+
 - Websites visited
 - Traffic content
 - DNS queries
 - Connection history
 
 Local logs (if enabled) only contain:
+
 - Connection status
 - Error messages for debugging
 - Performance metrics (latency)
@@ -576,6 +609,7 @@ Local logs (if enabled) only contain:
 <summary><b>Can I use JhopanStoreVPN for gaming?</b></summary>
 
 Yes! TUN mode supports:
+
 - ✅ Steam, Epic Games, Battle.net
 - ✅ Multiplayer games (CS:GO, Dota 2, League of Legends)
 - ✅ Xbox/PlayStation network connectivity
@@ -586,13 +620,13 @@ Yes! TUN mode supports:
 <details>
 <summary><b>What's the difference between proxy mode and TUN mode?</b></summary>
 
-| Feature | Proxy Mode | TUN Mode (JhopanStoreVPN) |
-|---------|-----------|---------------------------|
-| Requires admin | No | Yes |
-| Works with all apps | No (only proxy-aware) | Yes (system-wide) |
-| Gaming support | No | Yes |
-| Windows apps | No | Yes |
-| Configuration | Manual per-app | Automatic |
+| Feature             | Proxy Mode            | TUN Mode (JhopanStoreVPN) |
+| ------------------- | --------------------- | ------------------------- |
+| Requires admin      | No                    | Yes                       |
+| Works with all apps | No (only proxy-aware) | Yes (system-wide)         |
+| Gaming support      | No                    | Yes                       |
+| Windows apps        | No                    | Yes                       |
+| Configuration       | Manual per-app        | Automatic                 |
 
 </details>
 
@@ -607,6 +641,7 @@ No. Only one VPN/TUN interface can be active at a time. Attempting to run multip
 <summary><b>How do I check if VPN is working?</b></summary>
 
 **Desktop**:
+
 ```bash
 # Check your public IP
 curl ifconfig.me
@@ -615,6 +650,7 @@ curl ifconfig.me
 ```
 
 **Android**:
+
 - Check notification: should show "Connected" with upload/download stats
 - Visit: https://ifconfig.me in browser (should show VPN server IP)
 
