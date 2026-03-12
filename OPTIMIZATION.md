@@ -138,6 +138,12 @@ File: `core/xray/config.go` → `GenerateConfig()`
         "wsSettings": {
           "path": "/vless",
           "host": "<host-header>"
+        },
+        "sockopt": {
+          "tcpFastOpen": true,
+          "tcpNoDelay": true,
+          "tcpKeepAliveIdle": 60,
+          "tcpKeepAliveInterval": 30
         }
       }
     },
@@ -172,9 +178,11 @@ File: `core/xray/config.go` → `GenerateConfig()`
 
 > **Catatan Desktop:**
 > - Hanya 1 inbound (SOCKS5 port 10808). HTTP inbound (10809) dihapus.
-> - Sniffing tidak ada (tidak pernah dibutuhkan untuk full-tunnel VPN).
+> - **Sniffing dinonaktifkan** (tidak ada blok `sniffing` di inbound) — tidak berguna untuk full-tunnel VPN dan memakan CPU.
 > - Local IP ranges langsung di-direct, tidak lewat proxy.
-> - `block` outbound ada di desktop karena belum di-refactor (tidak merusak fungsionalitas).
+> - `tcpNoDelay: true` — matikan Nagle's algorithm di koneksi Xray→server → latency lebih rendah.
+> - `tcpKeepAliveIdle: 60` + `tcpKeepAliveInterval: 30` — OS kirim probe TCP setiap 30 s setelah 60 s idle → deteksi koneksi mati maksimal 30 s, tidak menunggu timeout menit-menit.
+> - `block` outbound ada di desktop (belum di-refactor; tidak merusak fungsionalitas).
 
 ---
 
@@ -246,7 +254,10 @@ File: `XrayManager.kt` → `buildConfig()`
           "allowInsecure": false
         },
         "sockopt": {
-          "tcpFastOpen": true
+          "tcpFastOpen": true,
+          "tcpNoDelay": true,
+          "tcpKeepAliveIdle": 60,
+          "tcpKeepAliveInterval": 30
         }
       },
       "mux": {
@@ -291,6 +302,9 @@ File: `XrayManager.kt` → `buildConfig()`
 ```
 
 > **Catatan Android:**
+> - **Sniffing dinonaktifkan** — tidak ada blok `sniffing` di inbound, memang sengaja (tidak berguna untuk full-tunnel, hanya buang CPU).
+> - `tcpNoDelay: true` — matikan Nagle's algorithm di koneksi Xray→server, kurangi latency.
+> - `tcpKeepAliveIdle: 60` + `tcpKeepAliveInterval: 30` — probe TCP tiap 30 s setelah 60 s idle → NAT timeout terdeteksi cepat, auto-reconnect lebih responsif.
 > - `mux concurrency:8` — multipleks 8 stream TCP dalam 1 koneksi WebSocket/TLS, kurangi TLS handshake.
 > - `tcpFastOpen: true` — kurangi 1 RTT saat reconnect (tersedia Android API 21+).
 > - `statsInbound/Outbound: false` — Xray tidak tracking traffic per-koneksi, kurangi CPU.

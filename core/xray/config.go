@@ -77,6 +77,13 @@ func GenerateConfig(vc vless.Config, dns1, dns2 string, allowInsecure bool) ([]b
 						"path": vc.Path,
 						"host": vc.Host,
 					},
+					// sockopt: tune the Xray→server TCP connection
+					"sockopt": map[string]interface{}{
+						"tcpFastOpen":          true, // -1 RTT on reconnect
+						"tcpNoDelay":           true, // disable Nagle → lower latency
+						"tcpKeepAliveIdle":     60,   // start probes after 60s idle
+						"tcpKeepAliveInterval": 30,   // probe every 30s
+					},
 				},
 			},
 			{

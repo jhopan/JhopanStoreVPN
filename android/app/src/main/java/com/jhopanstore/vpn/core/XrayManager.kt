@@ -142,8 +142,17 @@ object XrayManager {
             put("security", cfg.security)
             put("wsSettings", wsSettings)
             if (cfg.security == "tls") put("tlsSettings", tlsSettings)
-            // Enable TCP Fast Open — reduces 1 RTT on reconnection (available Android API 21+)
-            put("sockopt", JSONObject().apply { put("tcpFastOpen", true) })
+            // sockopt: tune the Xray→server TCP connection
+            // - tcpFastOpen:          -1 RTT on reconnect (TFO cookie reuse)
+            // - tcpNoDelay:           disable Nagle on Xray→server, lower latency
+            // - tcpKeepAliveIdle:     start keepalive probes after 60 s idle
+            // - tcpKeepAliveInterval: probe every 30 s → detect dead NAT in ≤30 s
+            put("sockopt", JSONObject().apply {
+                put("tcpFastOpen", true)
+                put("tcpNoDelay", true)
+                put("tcpKeepAliveIdle", 60)
+                put("tcpKeepAliveInterval", 30)
+            })
         }
 
         val serverAddress = resolvedIp ?: cfg.address
