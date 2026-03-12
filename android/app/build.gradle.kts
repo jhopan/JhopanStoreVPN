@@ -50,6 +50,12 @@ android {
             )
             // Use debug signing for now (replace with proper keystore for production)
             signingConfig = signingConfigs.getByName("debug")
+            // Strip debug symbols from native .so (default is RelWithDebInfo which bloats APK)
+            externalNativeBuild {
+                cmake {
+                    arguments("-DCMAKE_BUILD_TYPE=Release")
+                }
+            }
         }
     }
 
