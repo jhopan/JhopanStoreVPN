@@ -230,8 +230,6 @@ jobs:
     runs-on: macos-latest
     permissions:
       contents: write
-      (github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/') && needs.changes.outputs.desktop == 'true')
-    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
